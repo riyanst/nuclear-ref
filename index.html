@@ -596,6 +596,73 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .toast.success { border-color: rgba(40,160,80,0.4); color: #4CC882; }
 .toast.error   { border-color: rgba(200,60,60,0.4); color: #E06060; }
 
+/* ── DRILLDOWN ─────────────────────────────────────── */
+.explorable {
+  border-bottom: 1px dashed rgba(200,136,32,0.55);
+  cursor: pointer;
+  padding-bottom: 1px;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+.explorable:hover, .explorable.dd-open { background: var(--accent-muted); color: var(--accent-lt); border-bottom-color: var(--accent); }
+.explorable.dd-max { border-bottom: 1px dotted rgba(255,255,255,0.18); cursor: default; opacity: 0.7; }
+.explorable.dd-max:hover { background: none; color: inherit; }
+
+#dd-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 498; }
+#dd-svg path { stroke: rgba(223,160,64,0.5); stroke-width: 1.3; fill: none; }
+
+.dd-popup {
+  position: fixed;
+  width: min(400px, calc(100vw - 28px));
+  max-height: min(480px, calc(100vh - 32px));
+  display: flex; flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,136,32,0.05);
+  z-index: 500;
+  animation: ddIn 180ms ease;
+}
+@keyframes ddIn { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+.dd-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: grab; user-select: none; flex-shrink: 0;
+  touch-action: none;
+}
+.dd-head:active { cursor: grabbing; }
+.dd-head-label {
+  flex: 1; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--accent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dd-level-tag {
+  font-family: var(--mono); font-size: 9px; color: var(--text-3);
+  border: 1px solid var(--border); padding: 1px 6px; border-radius: 3px; flex-shrink: 0;
+}
+.dd-close {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  font-size: 16px; line-height: 1; padding: 2px 5px; border-radius: 4px;
+  transition: color var(--ease); flex-shrink: 0; font-family: var(--font);
+}
+.dd-close:hover { color: var(--text-1); }
+
+.dd-body { padding: 6px 16px 12px; overflow-y: auto; }
+.dd-sec { padding: 11px 0; border-bottom: 1px solid var(--border); }
+.dd-sec:last-child { border-bottom: none; }
+.dd-sec-label { font-family: var(--mono); font-size: 9.5px; font-weight: 500; letter-spacing: 0.14em; color: var(--accent); margin-bottom: 5px; }
+.dd-sec-text { font-size: 13px; color: var(--text-2); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.dd-missing, .dd-loading { padding: 26px 0; text-align: center; font-size: 12.5px; color: var(--text-3); }
+.dd-loading { font-family: var(--mono); font-size: 11.5px; }
+
+/* Drilldown admin */
+.dd-adm-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.dd-adm-id { font-family: var(--mono); font-size: 12.5px; color: var(--accent-lt); flex-shrink: 0; }
+.dd-adm-sentence { font-size: 12px; color: var(--text-3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.dd-mark-bar { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.dd-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.7; margin-top: 10px; }
+
 /* Mobile */
 .mobile-bar {
   display: none; position: fixed; top: 0; left: 0; right: 0;
@@ -804,6 +871,7 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
         <button class="admin-tab" onclick="switchAdminTab('glossary',this)">Glossary</button>
         <button class="admin-tab" onclick="switchAdminTab('future',this)">Future Scope</button>
         <button class="admin-tab" onclick="switchAdminTab('about',this)">About</button>
+        <button class="admin-tab" onclick="switchAdminTab('drilldown',this)">Drilldown</button>
       </div>
       <div id="admin-content"></div>
     </section>
@@ -1049,6 +1117,8 @@ function renderGlossary() {
 function renderProfile(r) {
   const pc = document.getElementById('profile-content');
   if (!pc) return;
+  /* drill-down pilot: NERVA renders with explorable-sentence parsing */
+  const rt = (window.DD && DD.enabledFor(r.id)) ? (t) => DD.renderRich(t, 0) : renderText;
   const pillClass = 'pill-' + (r.statusType || 'historical');
   const specsHtml = r.specs && r.specs.length
     ? `<div class="spec-table">${r.specs.map(s => `<div class="spec-cell"><div class="spec-key">${esc(s.key)}</div><div class="spec-val">${esc(s.value)}</div></div>`).join('')}</div>`
@@ -1067,10 +1137,10 @@ function renderProfile(r) {
       <div class="profile-fullname">${esc(r.fullName)}</div>
     </div>
     ${specsHtml}
-    <div class="profile-block"><div class="block-label">Design overview</div>${renderText(r.designOverview)}</div>
-    <div class="profile-block"><div class="block-label">Key materials</div>${renderText(r.keyMaterials)}</div>
-    <div class="profile-block"><div class="block-label">Operating conditions</div>${renderText(r.operatingConditions)}</div>
-    <div class="profile-block"><div class="block-label">Current status</div>${renderText(r.currentStatus)}</div>`;
+    <div class="profile-block"><div class="block-label">Design overview</div>${rt(r.designOverview)}</div>
+    <div class="profile-block"><div class="block-label">Key materials</div>${rt(r.keyMaterials)}</div>
+    <div class="profile-block"><div class="block-label">Operating conditions</div>${rt(r.operatingConditions)}</div>
+    <div class="profile-block"><div class="block-label">Current status</div>${rt(r.currentStatus)}</div>`;
 }
 
 function renderSidebarNav() {
@@ -1084,6 +1154,7 @@ function setHTML(id, html) { const el = document.getElementById(id); if (el) el.
 
 /* ── NAVIGATION ────────────────────────────────────── */
 function show(sectionId) {
+  if (window.DD) DD.closeAll();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item, .nav-sub-item').forEach(b => b.classList.remove('active'));
   const sec = document.getElementById(sectionId);
@@ -1168,11 +1239,11 @@ function switchAdminTab(tab, btn) {
   if (btn) btn.classList.add('active');
   else {
     const tabs = document.querySelectorAll('.admin-tab');
-    const map = ['home','reactors','glossary','future','about'];
+    const map = ['home','reactors','glossary','future','about','drilldown'];
     const i = map.indexOf(tab);
     if (i > -1 && tabs[i]) tabs[i].classList.add('active');
   }
-  const renders = { home: renderAdminHome, reactors: renderAdminReactors, glossary: renderAdminGlossary, future: renderAdminFuture, about: renderAdminAbout };
+  const renders = { home: renderAdminHome, reactors: renderAdminReactors, glossary: renderAdminGlossary, future: renderAdminFuture, about: renderAdminAbout, drilldown: () => DD.renderAdmin() };
   if (renders[tab]) renders[tab]();
 }
 
@@ -1562,6 +1633,519 @@ document.querySelectorAll('[data-target]').forEach(btn => {
   await seedIfNeeded();
   loadAll();
 })();
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   DRILLDOWN — recursive first-principles explorer
+   Self-contained module. Owns only the "drilldown"
+   Firestore collection plus the marker syntax
+   {{explore:id}}sentence{{/explore}} embedded in content
+   text. Rendered markers become:
+     <span class="explorable" data-id="id">sentence</span>
+   Clicking one opens a draggable WHAT/WHY/WHERE/WHEN/HOW
+   card connected to its source sentence by an arrow.
+   Recursion is capped at 3 levels.
+   Pilot: enabled on the NERVA profile page only.
+   ══════════════════════════════════════════════════════ */
+const DD = (() => {
+
+  const PILOT_PAGES = ['nerva'];
+  const MAX_LEVEL   = 3;
+  const FIELDS      = ['what', 'why', 'where', 'when', 'how'];
+  const REACTOR_FIELDS = [
+    { key: 'designOverview',      label: 'Design overview' },
+    { key: 'keyMaterials',        label: 'Key materials' },
+    { key: 'operatingConditions', label: 'Operating conditions' },
+    { key: 'currentStatus',       label: 'Current status' }
+  ];
+  const MARK_RE = /\{\{explore:([A-Za-z0-9_-]+)\}\}([\s\S]*?)\{\{\/explore\}\}/g;
+
+  /* ── state ─────────────────────────────────────────── */
+  let docs = {};            // id -> drilldown doc data (live cache)
+  let firstSnap = false;
+  const popups = new Map(); // id -> { el, path, anchor, level, parentId }
+  let zTop = 500;
+  let svg = null;
+  let rafId = null;
+  const adm = { page: 'nerva', view: 'list', editId: null, source: 'reactor', field: 'designOverview' };
+
+  const escT = s => s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  function enabledFor(pageId) { return PILOT_PAGES.includes(pageId); }
+
+  /* ── marker parsing ────────────────────────────────── */
+  function parse(text, level) {
+    const maxed = level >= MAX_LEVEL;
+    MARK_RE.lastIndex = 0;
+    let html = '', last = 0, m;
+    while ((m = MARK_RE.exec(text)) !== null) {
+      html += escT(text.slice(last, m.index));
+      html += '<span class="explorable' + (maxed ? ' dd-max' : '') +
+              '" data-id="' + escT(m[1]) + '" data-level="' + level + '"' +
+              (maxed ? ' title="Maximum drill-down depth reached"' : '') + '>' +
+              escT(m[2]) + '</span>';
+      last = m.index + m[0].length;
+    }
+    html += escT(text.slice(last));
+    return html;
+  }
+
+  function renderRich(text, level) {
+    if (!text || !text.trim()) return '<div class="empty-slot"></div>';
+    return '<div class="content-block">' + parse(text, level || 0) + '</div>';
+  }
+
+  function extractMarks(text) {
+    MARK_RE.lastIndex = 0;
+    const out = []; let m;
+    while ((m = MARK_RE.exec(text || '')) !== null) out.push({ id: m[1], label: m[2] });
+    return out;
+  }
+
+  /* ── Firestore ─────────────────────────────────────── */
+  function listen() {
+    db.collection('drilldown').onSnapshot(snap => {
+      docs = {};
+      snap.forEach(d => { docs[d.id] = d.data(); });
+      firstSnap = true;
+      if (S.isAdmin && S.adminTab === 'drilldown' && adm.view === 'list') refreshList();
+    }, err => console.warn('drilldown listener:', err));
+  }
+
+  async function fetchDoc(id) {
+    if (firstSnap) return docs[id] || null;
+    try {
+      const s = await db.collection('drilldown').doc(id).get();
+      return s.exists ? s.data() : null;
+    } catch (e) { console.warn('drilldown fetch:', e); return null; }
+  }
+
+  /* ── popups ────────────────────────────────────────── */
+  function buildSvg() {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'dd-svg';
+    svg.innerHTML = '<defs><marker id="dd-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6.5" markerHeight="6.5" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#DFA040" opacity="0.85"/></marker></defs>';
+    document.body.appendChild(svg);
+  }
+
+  function sectionsHTML(data, level) {
+    if (!data) return '<div class="dd-missing">Content not yet added</div>';
+    const secs = FIELDS
+      .filter(f => data[f] && String(data[f]).trim())
+      .map(f => '<div class="dd-sec"><div class="dd-sec-label">' + f.toUpperCase() +
+                '</div><div class="dd-sec-text">' + parse(String(data[f]), level) + '</div></div>')
+      .join('');
+    return secs || '<div class="dd-missing">Content not yet added</div>';
+  }
+
+  async function openPopup(span) {
+    const id = span.dataset.id;
+    if (!id) return;
+    if (popups.has(id)) { bringToFront(id); return; }
+    const level = Math.min(MAX_LEVEL, (parseInt(span.dataset.level, 10) || 0) + 1);
+    const parentEl = span.closest('.dd-popup');
+    const parentId = parentEl ? parentEl.getAttribute('data-dd-id') : null;
+
+    const el = document.createElement('div');
+    el.className = 'dd-popup';
+    el.setAttribute('data-dd-id', id);
+    el.style.zIndex = ++zTop;
+    el.innerHTML =
+      '<div class="dd-head">' +
+        '<span class="dd-head-label" title="' + escT(id) + '">' + escT(id) + '</span>' +
+        '<span class="dd-level-tag">L' + level + '</span>' +
+        '<button class="dd-close" aria-label="Close">×</button>' +
+      '</div>' +
+      '<div class="dd-body"><div class="dd-loading">Loading…</div></div>';
+    document.body.appendChild(el);
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('marker-end', 'url(#dd-arrow)');
+    svg.appendChild(path);
+
+    popups.set(id, { el, path, anchor: span, level, parentId });
+    span.classList.add('dd-open');
+
+    el.querySelector('.dd-close').addEventListener('click', () => closePopup(id));
+    el.addEventListener('pointerdown', () => { el.style.zIndex = ++zTop; });
+    makeDraggable(el);
+    place(el, span.getBoundingClientRect(), level);
+    startLoop();
+
+    const data = await fetchDoc(id);
+    if (!popups.has(id)) return; /* closed while loading */
+    el.querySelector('.dd-body').innerHTML = sectionsHTML(data, level);
+  }
+
+  function place(el, sr, level) {
+    const m = 14, gap = 36;
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let x = sr.right + gap;
+    let y = sr.top - 12 + (level - 1) * 20;
+    if (x + w > window.innerWidth - m) x = sr.left - gap - w;
+    if (x < m) {
+      x = Math.min(Math.max(m, sr.left + 16), window.innerWidth - w - m);
+      y = sr.bottom + gap;
+    }
+    x = Math.max(m, Math.min(x, window.innerWidth - w - m));
+    y = Math.max(m, Math.min(y, window.innerHeight - h - m));
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+  }
+
+  function makeDraggable(el) {
+    const head = el.querySelector('.dd-head');
+    head.addEventListener('pointerdown', e => {
+      if (e.target.closest('.dd-close')) return;
+      e.preventDefault();
+      const sx = e.clientX - el.offsetLeft;
+      const sy = e.clientY - el.offsetTop;
+      const move = ev => {
+        el.style.left = Math.max(4, Math.min(ev.clientX - sx, window.innerWidth - 60)) + 'px';
+        el.style.top  = Math.max(4, Math.min(ev.clientY - sy, window.innerHeight - 40)) + 'px';
+      };
+      const up = () => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    });
+  }
+
+  function descendantsOf(id) {
+    const out = [];
+    popups.forEach((p, pid) => {
+      if (p.parentId === id) { out.push(pid); out.push(...descendantsOf(pid)); }
+    });
+    return out;
+  }
+
+  function removeOne(id) {
+    const p = popups.get(id);
+    if (!p) return;
+    popups.delete(id);
+    p.el.remove();
+    p.path.remove();
+    if (p.anchor && p.anchor.isConnected) p.anchor.classList.remove('dd-open');
+  }
+
+  function closePopup(id) {
+    descendantsOf(id).forEach(removeOne);
+    removeOne(id);
+  }
+
+  function closeAll() { [...popups.keys()].forEach(removeOne); }
+  function bringToFront(id) { const p = popups.get(id); if (p) p.el.style.zIndex = ++zTop; }
+
+  /* ── connectors ────────────────────────────────────── */
+  function edgePoint(rect, toward) {
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const dx = toward.x - cx, dy = toward.y - cy;
+    if (!dx && !dy) return { x: cx, y: cy };
+    const s = Math.min(
+      rect.width  / 2 / (Math.abs(dx) || 1e-6),
+      rect.height / 2 / (Math.abs(dy) || 1e-6),
+      1e6
+    );
+    return { x: cx + dx * s, y: cy + dy * s };
+  }
+
+  function updateAll() {
+    popups.forEach((p, id) => {
+      const a = p.anchor;
+      if (!a || !a.isConnected) { closePopup(id); return; }
+      const sr = a.getBoundingClientRect();
+      if (!sr.width && !sr.height) { closePopup(id); return; }
+      const pr = p.el.getBoundingClientRect();
+      const sc = { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 };
+      const pc = { x: pr.left + pr.width / 2, y: pr.top + pr.height / 2 };
+      const p1 = edgePoint(pr, sc);
+      const p2 = edgePoint({ left: sr.left - 5, top: sr.top - 5, width: sr.width + 10, height: sr.height + 10 }, pc);
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const k = Math.min(26, dist * 0.16);
+      p.path.setAttribute('d',
+        'M' + p1.x.toFixed(1) + ',' + p1.y.toFixed(1) +
+        ' Q' + (mx - dy / dist * k).toFixed(1) + ',' + (my + dx / dist * k).toFixed(1) +
+        ' ' + p2.x.toFixed(1) + ',' + p2.y.toFixed(1));
+    });
+  }
+
+  function tick() {
+    updateAll();
+    rafId = popups.size ? requestAnimationFrame(tick) : null;
+  }
+  function startLoop() { if (!rafId) rafId = requestAnimationFrame(tick); }
+
+  /* ── admin: drilldown tab ──────────────────────────── */
+  function pageDocs() {
+    return Object.entries(docs)
+      .filter(([, d]) => (d.page || 'nerva') === adm.page)
+      .sort((a, b) => a[0].localeCompare(b[0]));
+  }
+
+  function sourceText() {
+    if (adm.source === 'reactor') {
+      const r = S.reactors.find(x => x.id === adm.page);
+      return r ? (r[adm.field] || '') : '';
+    }
+    const d = docs[adm.source.slice(3)];
+    return d ? (d[adm.field] || '') : '';
+  }
+
+  function listHTML() {
+    const items = pageDocs();
+    if (!items.length) return '<p style="font-size:13px;color:var(--text-3);padding:10px 0">No explorable sentences yet — mark one below.</p>';
+    return items.map(([id, d]) => {
+      const filled = FIELDS.filter(f => d[f] && String(d[f]).trim()).length;
+      return '<div class="dd-adm-item">' +
+        '<span class="dd-adm-id">' + escT(id) + '</span>' +
+        '<span class="dd-adm-sentence">' + escT(d.label || '') + '</span>' +
+        '<span class="dd-level-tag">' + filled + '/5 filled</span>' +
+        '<div class="admin-item-actions">' +
+          '<button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="DD.admEdit(\'' + escT(id) + '\')">Edit</button>' +
+          '<button class="btn-danger" style="font-size:11px;padding:5px 10px" onclick="DD.admDelete(\'' + escT(id) + '\')">Delete</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function refreshList() {
+    const el = document.getElementById('dd-adm-list');
+    if (el) el.innerHTML = listHTML();
+  }
+
+  function renderAdmin() {
+    const el = document.getElementById('admin-content');
+    if (!el) return;
+    if (adm.view === 'edit') { renderAdminEdit(el); return; }
+
+    const reactorsList = S.reactors.length ? S.reactors : [{ id: 'nerva', name: 'NERVA' }];
+    const pageOpts = reactorsList.map(r =>
+      '<option value="' + escT(r.id) + '"' + (r.id === adm.page ? ' selected' : '') +
+      (enabledFor(r.id) ? '' : ' disabled') + '>' + escT(r.name) + (enabledFor(r.id) ? '' : ' — pilot pending') + '</option>').join('');
+
+    const srcOpts =
+      '<option value="reactor"' + (adm.source === 'reactor' ? ' selected' : '') + '>Page content — ' + escT(adm.page.toUpperCase()) + '</option>' +
+      pageDocs().map(([id]) =>
+        '<option value="dd:' + escT(id) + '"' + (adm.source === 'dd:' + id ? ' selected' : '') + '>Drilldown — ' + escT(id) + '</option>').join('');
+
+    const fieldDefs = adm.source === 'reactor'
+      ? REACTOR_FIELDS
+      : FIELDS.map(f => ({ key: f, label: f.toUpperCase() }));
+    const fieldOpts = fieldDefs.map(f =>
+      '<option value="' + f.key + '"' + (adm.field === f.key ? ' selected' : '') + '>' + escT(f.label) + '</option>').join('');
+
+    el.innerHTML =
+      '<div class="admin-field" style="max-width:320px"><label class="admin-label">Reactor page</label>' +
+        '<select class="admin-select" style="width:100%" onchange="DD.admSetPage(this.value)">' + pageOpts + '</select></div>' +
+      '<div class="admin-form-section-title" style="margin-top:28px">Explorable sentences — ' + escT(adm.page) + '</div>' +
+      '<div id="dd-adm-list">' + listHTML() + '</div>' +
+      '<div style="margin-top:36px;padding-top:28px;border-top:1px solid var(--border)">' +
+        '<div class="admin-form-section-title">Mark a sentence as explorable</div>' +
+        '<div class="admin-2col">' +
+          '<div class="admin-field"><label class="admin-label">Source</label>' +
+            '<select class="admin-select" style="width:100%" onchange="DD.admSetSource(this.value)">' + srcOpts + '</select></div>' +
+          '<div class="admin-field"><label class="admin-label">Content block</label>' +
+            '<select class="admin-select" style="width:100%" onchange="DD.admSetField(this.value)">' + fieldOpts + '</select></div>' +
+        '</div>' +
+        '<div class="admin-field"><label class="admin-label">Text — select a sentence below</label>' +
+          '<textarea class="admin-textarea" id="dd-adm-text" rows="9">' + escT(sourceText()) + '</textarea></div>' +
+        '<div class="dd-mark-bar">' +
+          '<input class="admin-input" id="dd-new-id" placeholder="unique-id e.g. graphite-moderator" style="width:250px;font-family:var(--mono);font-size:12px">' +
+          '<button class="btn-outline" onclick="DD.admMark()">Mark selection</button>' +
+          '<button class="btn-save" onclick="DD.admSaveSource()">Save to Firestore</button>' +
+        '</div>' +
+        '<div class="dd-hint">Select the sentence in the text above, type a unique ID, then <b>Mark selection</b> — it wraps the sentence in {{explore:id}} … {{/explore}}. <b>Save to Firestore</b> writes the marked text back and creates a drilldown entry for every new ID; fill in its WHAT / WHY / WHERE / WHEN / HOW via <b>Edit</b> in the list above. Marking inside a drilldown source creates nested levels — the site caps drill-down at 3 levels.</div>' +
+      '</div>';
+  }
+
+  function renderAdminEdit(el) {
+    const id = adm.editId;
+    const d = docs[id];
+    if (!d) { adm.view = 'list'; adm.editId = null; renderAdmin(); return; }
+
+    const fieldBlock = f =>
+      '<div class="admin-field"><label class="admin-label">' + f.toUpperCase() + '</label>' +
+      '<textarea class="admin-textarea" id="dd-f-' + f + '" rows="4">' + escT(d[f] || '') + '</textarea>' +
+      '<div class="dd-mark-bar" style="margin-top:6px">' +
+        '<button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="DD.admMarkField(\'' + f + '\')">Mark selection in ' + f.toUpperCase() + '</button>' +
+      '</div></div>';
+
+    el.innerHTML =
+      '<button class="back-btn" style="margin-bottom:20px" onclick="DD.admBack()">' +
+        '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 2L3.5 6l4 4"/></svg>' +
+        ' Back to drilldown list</button>' +
+      '<div class="admin-edit-panel">' +
+        '<div class="admin-edit-title" style="font-family:var(--mono);font-size:15px">' + escT(id) + '</div>' +
+        '<div class="dd-hint" style="margin:-12px 0 24px">Sentence: “' + escT(d.label || '—') + '” · Page: ' + escT(d.page || 'nerva') + '</div>' +
+        '<div class="admin-field"><label class="admin-label">New nested ID — used by the “Mark selection” buttons below</label>' +
+          '<input class="admin-input" id="dd-new-id-edit" placeholder="unique-id" style="width:250px;font-family:var(--mono);font-size:12px"></div>' +
+        FIELDS.map(fieldBlock).join('') +
+        '<div class="dd-hint">To nest a further drill-down, select text in a field above, type a new ID, and click that field’s “Mark selection”. New IDs get their own drilldown entries when you save. The site caps drill-down at 3 levels.</div>' +
+        '<div class="admin-actions-bar">' +
+          '<button class="btn-danger" onclick="DD.admDelete(\'' + escT(id) + '\')">Delete entry</button>' +
+          '<button class="btn-save" onclick="DD.admSaveDoc(\'' + escT(id) + '\')">Save changes</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ── admin actions ─────────────────────────────────── */
+  function admSetPage(v) {
+    if (!enabledFor(v)) { showToast('Drill-down is piloted on NERVA only for now.', 'error'); }
+    else { adm.page = v; }
+    adm.source = 'reactor'; adm.field = 'designOverview';
+    renderAdmin();
+  }
+
+  function admSetSource(v) {
+    adm.source = v;
+    adm.field = v === 'reactor' ? 'designOverview' : 'what';
+    renderAdmin();
+  }
+
+  function admSetField(v) {
+    adm.field = v;
+    const ta = document.getElementById('dd-adm-text');
+    if (ta) ta.value = sourceText();
+  }
+
+  function markInTextarea(ta, idIn) {
+    if (!ta || !idIn) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    if (start === end) { showToast('Select the sentence to mark first.', 'error'); return; }
+    const id = (idIn.value || '').trim();
+    if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id)) { showToast('Enter a valid ID first (letters, numbers, dashes).', 'error'); return; }
+    const text = ta.value;
+    const sel = text.slice(start, end);
+    if (sel.includes('{{') || sel.includes('}}')) { showToast('Selection overlaps an existing marker.', 'error'); return; }
+    const before = text.slice(0, start);
+    if (before.lastIndexOf('{{explore:') > before.lastIndexOf('{{/explore}}')) {
+      showToast('Selection is inside an existing marker.', 'error'); return;
+    }
+    if (docs[id] || extractMarks(text).some(x => x.id === id)) {
+      showToast('ID "' + id + '" is already in use.', 'error'); return;
+    }
+    ta.value = before + '{{explore:' + id + '}}' + sel + '{{/explore}}' + text.slice(end);
+    idIn.value = '';
+    showToast('Marked — now save to Firestore.', 'success');
+  }
+
+  function admMark() {
+    markInTextarea(document.getElementById('dd-adm-text'), document.getElementById('dd-new-id'));
+  }
+
+  function admMarkField(f) {
+    markInTextarea(document.getElementById('dd-f-' + f), document.getElementById('dd-new-id-edit'));
+  }
+
+  async function ensureDocs(texts, page) {
+    const marks = [];
+    texts.forEach(t => extractMarks(t).forEach(m => marks.push(m)));
+    const fresh = marks.filter((m, i) => !docs[m.id] && marks.findIndex(x => x.id === m.id) === i);
+    if (!fresh.length) return 0;
+    const batch = db.batch();
+    fresh.forEach(m => batch.set(db.collection('drilldown').doc(m.id), {
+      page: page, label: m.label, what: '', why: '', where: '', when: '', how: ''
+    }));
+    await batch.commit();
+    return fresh.length;
+  }
+
+  async function admSaveSource() {
+    const ta = document.getElementById('dd-adm-text');
+    if (!ta) return;
+    const text = ta.value;
+    try {
+      if (adm.source === 'reactor') {
+        await db.collection('reactors').doc(adm.page).update({ [adm.field]: text });
+      } else {
+        await db.collection('drilldown').doc(adm.source.slice(3)).update({ [adm.field]: text });
+      }
+      const created = await ensureDocs([text], adm.page);
+      showToast(created ? 'Saved — ' + created + ' new drilldown entr' + (created === 1 ? 'y' : 'ies') + ' created.' : 'Saved.', 'success');
+    } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+  }
+
+  async function admSaveDoc(id) {
+    const vals = {};
+    FIELDS.forEach(f => {
+      const ta = document.getElementById('dd-f-' + f);
+      vals[f] = ta ? ta.value : '';
+    });
+    try {
+      await db.collection('drilldown').doc(id).update(vals);
+      const page = (docs[id] && docs[id].page) || adm.page;
+      const created = await ensureDocs(FIELDS.map(f => vals[f]), page);
+      showToast(created ? 'Saved — ' + created + ' new nested entr' + (created === 1 ? 'y' : 'ies') + ' created.' : 'Saved.', 'success');
+    } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+  }
+
+  function admEdit(id) { adm.view = 'edit'; adm.editId = id; renderAdmin(); }
+  function admBack()   { adm.view = 'list'; adm.editId = null; renderAdmin(); }
+
+  async function admDelete(id) {
+    if (!confirm('Delete drilldown entry "' + id + '"? Its markers will be removed from all content. This cannot be undone.')) return;
+    const open = '{{explore:' + id + '}}';
+    const re = new RegExp('\\{\\{explore:' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}\\}([\\s\\S]*?)\\{\\{\\/explore\\}\\}', 'g');
+    try {
+      const batch = db.batch();
+      const page = (docs[id] && docs[id].page) || adm.page;
+      const r = S.reactors.find(x => x.id === page);
+      if (r) {
+        const upd = {};
+        REACTOR_FIELDS.forEach(f => {
+          const t = r[f.key] || '';
+          if (t.includes(open)) { re.lastIndex = 0; upd[f.key] = t.replace(re, '$1'); }
+        });
+        if (Object.keys(upd).length) batch.update(db.collection('reactors').doc(page), upd);
+      }
+      Object.entries(docs).forEach(([did, dd]) => {
+        if (did === id) return;
+        const upd = {};
+        FIELDS.forEach(f => {
+          const t = dd[f] || '';
+          if (t.includes(open)) { re.lastIndex = 0; upd[f] = t.replace(re, '$1'); }
+        });
+        if (Object.keys(upd).length) batch.update(db.collection('drilldown').doc(did), upd);
+      });
+      batch.delete(db.collection('drilldown').doc(id));
+      await batch.commit();
+      showToast('Entry deleted and markers removed.', 'success');
+      adm.view = 'list'; adm.editId = null;
+      renderAdmin();
+    } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+  }
+
+  /* ── init ──────────────────────────────────────────── */
+  buildSvg();
+  listen();
+
+  document.addEventListener('click', e => {
+    const span = e.target.closest('.explorable');
+    if (!span || span.classList.contains('dd-max')) return;
+    e.preventDefault();
+    openPopup(span);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && popups.size) {
+      const last = [...popups.keys()].pop();
+      closePopup(last);
+    }
+  });
+
+  return {
+    enabledFor, renderRich, closeAll, renderAdmin,
+    admSetPage, admSetSource, admSetField,
+    admMark, admMarkField, admSaveSource, admSaveDoc,
+    admEdit, admBack, admDelete
+  };
+})();
+window.DD = DD;
 </script>
 </body>
 </html>
