@@ -607,7 +607,10 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .explorable.dd-max { border-bottom: 1px dotted rgba(255,255,255,0.18); cursor: default; opacity: 0.7; }
 .explorable.dd-max:hover { background: none; color: inherit; }
 
-#dd-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 498; }
+/* connector layer sits ABOVE popups (which are bounded below 930) so
+   arrows visibly reach source sentences inside other popups; kept below
+   the password modal (1000) and toast (2000) */
+#dd-svg { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 940; }
 #dd-svg path { stroke: rgba(223,160,64,0.5); stroke-width: 1.3; fill: none; }
 
 .dd-popup {
@@ -662,6 +665,49 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .dd-adm-sentence { font-size: 12px; color: var(--text-3); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .dd-mark-bar { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 .dd-hint { font-size: 11.5px; color: var(--text-3); line-height: 1.7; margin-top: 10px; }
+
+/* Drilldown attachments */
+.dd-att, .dd-att-adm { margin-top: 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-3); }
+.dd-att summary, .dd-att-adm summary {
+  cursor: pointer; padding: 7px 12px; list-style: none;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3);
+  transition: color var(--ease); user-select: none;
+}
+.dd-att summary:hover, .dd-att-adm summary:hover { color: var(--text-2); }
+.dd-att summary::-webkit-details-marker, .dd-att-adm summary::-webkit-details-marker { display: none; }
+.dd-att summary::before, .dd-att-adm summary::before {
+  content: '▸'; font-size: 9px; color: var(--accent);
+  transition: transform var(--ease); flex-shrink: 0;
+}
+.dd-att[open] summary::before, .dd-att-adm[open] summary::before { transform: rotate(90deg); }
+.dd-att-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+.dd-att-img { max-width: 100%; border-radius: 6px; border: 1px solid var(--border); display: block; }
+.dd-att-frame { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 6px; background: #000; display: block; }
+.dd-att-cap { font-size: 11px; color: var(--text-3); margin-top: 5px; line-height: 1.5; }
+.dd-att-link {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  font-size: 12px; color: var(--accent-lt); text-decoration: none;
+  border: 1px solid var(--border); padding: 6px 11px; border-radius: 6px;
+  background: var(--bg-2); transition: border-color var(--ease);
+  max-width: 100%; overflow: hidden;
+}
+.dd-att-link:hover { border-color: var(--accent-border); }
+.dd-att-link svg { flex-shrink: 0; }
+.dd-att-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* attachments — admin editor */
+.dd-att-adm { background: var(--bg-2); }
+.dd-att-adm-inner { padding: 10px 12px 12px; }
+.dd-att-row {
+  display: grid; grid-template-columns: 110px 1.5fr 1fr 30px;
+  gap: 8px; margin-bottom: 8px; align-items: center;
+}
+.dd-att-row .admin-input, .dd-att-row .admin-select { padding: 7px 10px; font-size: 12px; }
+@media (max-width: 800px) {
+  .dd-att-row { grid-template-columns: 1fr 1fr; }
+}
 
 /* Mobile */
 .mobile-bar {
@@ -1730,12 +1776,64 @@ const DD = (() => {
     document.body.appendChild(svg);
   }
 
+  /* ── attachments ───────────────────────────────────── */
+  const ATT_TYPES = ['image', 'video', 'document', 'link'];
+
+  function safeUrl(u) {
+    u = String(u || '').trim();
+    return /^https?:\/\//i.test(u) ? u : '';
+  }
+
+  function fieldAtts(data, f) {
+    const list = data[f + 'Media'];
+    return Array.isArray(list) ? list.filter(a => a && safeUrl(a.url)) : [];
+  }
+
+  const ICON_DOC  = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 1.5h5.5L13 5v9.5a.5.5 0 01-.5.5h-8a.5.5 0 01-.5-.5v-13a.5.5 0 01.5-.5z"/><path d="M9.5 1.5V5H13M6 8.5h4M6 11h4"/></svg>';
+  const ICON_LINK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6.5 9.5l3-3M7.5 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M8.5 11.5l-1 1a2.5 2.5 0 01-3.5-3.5l1-1"/></svg>';
+  const ICON_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.5"/><path d="M6.5 5.5l4 2.5-4 2.5z" fill="currentColor" stroke="none"/></svg>';
+
+  function videoEmbed(url) {
+    const yt = url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+    if (yt) return '<iframe class="dd-att-frame" src="https://www.youtube-nocookie.com/embed/' + escT(yt[1]) + '" loading="lazy" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+    const vm = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vm) return '<iframe class="dd-att-frame" src="https://player.vimeo.com/video/' + escT(vm[1]) + '" loading="lazy" allow="fullscreen; picture-in-picture" allowfullscreen></iframe>';
+    if (/\.(mp4|webm|ogv|ogg|mov)([?#]|$)/i.test(url)) return '<video class="dd-att-frame" controls preload="metadata" src="' + escT(url) + '"></video>';
+    return null;
+  }
+
+  function attItemHTML(a) {
+    const url = safeUrl(a.url);
+    const cap = a.caption ? '<div class="dd-att-cap">' + escT(a.caption) + '</div>' : '';
+    if (a.type === 'image') {
+      return '<div><img class="dd-att-img" src="' + escT(url) + '" loading="lazy" alt="' + escT(a.caption || 'attachment') + '">' + cap + '</div>';
+    }
+    if (a.type === 'video') {
+      const emb = videoEmbed(url);
+      if (emb) return '<div>' + emb + cap + '</div>';
+      return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + ICON_PLAY + '<span>' + escT(a.caption || url) + '</span></a>';
+    }
+    const icon = a.type === 'document' ? ICON_DOC : ICON_LINK;
+    return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + icon + '<span>' + escT(a.caption || url) + '</span></a>';
+  }
+
+  function attachmentsHTML(items) {
+    if (!items.length) return '';
+    return '<details class="dd-att"><summary>Attachments (' + items.length + ')</summary>' +
+           '<div class="dd-att-body">' + items.map(attItemHTML).join('') + '</div></details>';
+  }
+
   function sectionsHTML(data, level) {
     if (!data) return '<div class="dd-missing">Content not yet added</div>';
     const secs = FIELDS
-      .filter(f => data[f] && String(data[f]).trim())
-      .map(f => '<div class="dd-sec"><div class="dd-sec-label">' + f.toUpperCase() +
-                '</div><div class="dd-sec-text">' + parse(String(data[f]), level) + '</div></div>')
+      .map(f => {
+        const text = data[f] && String(data[f]).trim() ? String(data[f]) : '';
+        const atts = fieldAtts(data, f);
+        if (!text && !atts.length) return '';
+        return '<div class="dd-sec"><div class="dd-sec-label">' + f.toUpperCase() + '</div>' +
+               (text ? '<div class="dd-sec-text">' + parse(text, level) + '</div>' : '') +
+               attachmentsHTML(atts) + '</div>';
+      })
       .join('');
     return secs || '<div class="dd-missing">Content not yet added</div>';
   }
@@ -1751,7 +1849,7 @@ const DD = (() => {
     const el = document.createElement('div');
     el.className = 'dd-popup';
     el.setAttribute('data-dd-id', id);
-    el.style.zIndex = ++zTop;
+    raise(el);
     el.innerHTML =
       '<div class="dd-head">' +
         '<span class="dd-head-label" title="' + escT(id) + '">' + escT(id) + '</span>' +
@@ -1769,7 +1867,7 @@ const DD = (() => {
     span.classList.add('dd-open');
 
     el.querySelector('.dd-close').addEventListener('click', () => closePopup(id));
-    el.addEventListener('pointerdown', () => { el.style.zIndex = ++zTop; });
+    el.addEventListener('pointerdown', () => raise(el));
     makeDraggable(el);
     place(el, span.getBoundingClientRect(), level);
     startLoop();
@@ -1823,6 +1921,18 @@ const DD = (() => {
     return out;
   }
 
+  /* popups must stay below the connector SVG (z 940); renumber before the
+     counter can reach it, and reset once the last popup closes */
+  function raise(el) {
+    if (zTop >= 920) {
+      zTop = 500;
+      [...popups.values()]
+        .sort((a, b) => (+a.el.style.zIndex || 0) - (+b.el.style.zIndex || 0))
+        .forEach(p => { p.el.style.zIndex = ++zTop; });
+    }
+    el.style.zIndex = ++zTop;
+  }
+
   function removeOne(id) {
     const p = popups.get(id);
     if (!p) return;
@@ -1830,6 +1940,7 @@ const DD = (() => {
     p.el.remove();
     p.path.remove();
     if (p.anchor && p.anchor.isConnected) p.anchor.classList.remove('dd-open');
+    if (!popups.size) zTop = 500;
   }
 
   function closePopup(id) {
@@ -1838,7 +1949,7 @@ const DD = (() => {
   }
 
   function closeAll() { [...popups.keys()].forEach(removeOne); }
-  function bringToFront(id) { const p = popups.get(id); if (p) p.el.style.zIndex = ++zTop; }
+  function bringToFront(id) { const p = popups.get(id); if (p) raise(p.el); }
 
   /* ── connectors ────────────────────────────────────── */
   function edgePoint(rect, toward) {
@@ -1859,6 +1970,17 @@ const DD = (() => {
       if (!a || !a.isConnected) { closePopup(id); return; }
       const sr = a.getBoundingClientRect();
       if (!sr.width && !sr.height) { closePopup(id); return; }
+      /* anchor lives inside another popup's scrollable body: hide the
+         connector while the sentence is scrolled out of view */
+      const host = a.closest('.dd-body');
+      if (host) {
+        const hr = host.getBoundingClientRect();
+        const visible = sr.bottom > hr.top + 2 && sr.top < hr.bottom - 2;
+        p.path.style.display = visible ? '' : 'none';
+        if (!visible) return;
+      } else {
+        p.path.style.display = '';
+      }
       const pr = p.el.getBoundingClientRect();
       const sc = { x: sr.left + sr.width / 2, y: sr.top + sr.height / 2 };
       const pc = { x: pr.left + pr.width / 2, y: pr.top + pr.height / 2 };
@@ -1968,12 +2090,20 @@ const DD = (() => {
     const d = docs[id];
     if (!d) { adm.view = 'list'; adm.editId = null; renderAdmin(); return; }
 
-    const fieldBlock = f =>
-      '<div class="admin-field"><label class="admin-label">' + f.toUpperCase() + '</label>' +
+    const fieldBlock = f => {
+      const atts = Array.isArray(d[f + 'Media']) ? d[f + 'Media'] : [];
+      return '<div class="admin-field"><label class="admin-label">' + f.toUpperCase() + '</label>' +
       '<textarea class="admin-textarea" id="dd-f-' + f + '" rows="4">' + escT(d[f] || '') + '</textarea>' +
       '<div class="dd-mark-bar" style="margin-top:6px">' +
         '<button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="DD.admMarkField(\'' + f + '\')">Mark selection in ' + f.toUpperCase() + '</button>' +
-      '</div></div>';
+      '</div>' +
+      '<details class="dd-att-adm"' + (atts.length ? ' open' : '') + '><summary>Attachments (' + atts.length + ')</summary>' +
+        '<div class="dd-att-adm-inner" id="dd-att-' + f + '">' +
+          '<div class="dd-att-rows">' + atts.map(attRowHTML).join('') + '</div>' +
+          '<button class="btn-add-spec" onclick="DD.admAddAtt(\'' + f + '\')">+ Add attachment</button>' +
+        '</div></details>' +
+      '</div>';
+    };
 
     el.innerHTML =
       '<button class="back-btn" style="margin-bottom:20px" onclick="DD.admBack()">' +
@@ -2034,6 +2164,35 @@ const DD = (() => {
     showToast('Marked — now save to Firestore.', 'success');
   }
 
+  function attRowHTML(a) {
+    a = a || { type: 'image', url: '', caption: '' };
+    const opts = ATT_TYPES.map(t =>
+      '<option value="' + t + '"' + (a.type === t ? ' selected' : '') + '>' + t + '</option>').join('');
+    return '<div class="dd-att-row">' +
+      '<select class="admin-select dd-att-type">' + opts + '</select>' +
+      '<input class="admin-input dd-att-url" placeholder="https://…" value="' + escT(a.url || '') + '">' +
+      '<input class="admin-input dd-att-cap" placeholder="Caption (optional)" value="' + escT(a.caption || '') + '">' +
+      '<button class="btn-spec-rm" title="Remove" onclick="this.closest(\'.dd-att-row\').remove()">×</button>' +
+    '</div>';
+  }
+
+  function admAddAtt(f) {
+    const wrap = document.querySelector('#dd-att-' + f + ' .dd-att-rows');
+    if (!wrap) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = attRowHTML();
+    wrap.appendChild(tmp.firstChild);
+  }
+
+  function collectAtts(f) {
+    const rows = document.querySelectorAll('#dd-att-' + f + ' .dd-att-row');
+    return [...rows].map(row => ({
+      type:    row.querySelector('.dd-att-type').value,
+      url:     row.querySelector('.dd-att-url').value.trim(),
+      caption: row.querySelector('.dd-att-cap').value.trim()
+    })).filter(a => a.url);
+  }
+
   function admMark() {
     markInTextarea(document.getElementById('dd-adm-text'), document.getElementById('dd-new-id'));
   }
@@ -2075,6 +2234,7 @@ const DD = (() => {
     FIELDS.forEach(f => {
       const ta = document.getElementById('dd-f-' + f);
       vals[f] = ta ? ta.value : '';
+      if (document.getElementById('dd-att-' + f)) vals[f + 'Media'] = collectAtts(f);
     });
     try {
       await db.collection('drilldown').doc(id).update(vals);
@@ -2142,7 +2302,7 @@ const DD = (() => {
     enabledFor, renderRich, closeAll, renderAdmin,
     admSetPage, admSetSource, admSetField,
     admMark, admMarkField, admSaveSource, admSaveDoc,
-    admEdit, admBack, admDelete
+    admEdit, admBack, admDelete, admAddAtt
   };
 })();
 window.DD = DD;
