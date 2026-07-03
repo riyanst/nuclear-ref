@@ -709,6 +709,70 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
   .dd-att-row { grid-template-columns: 1fr 1fr; }
 }
 
+/* attachments — file upload */
+.dd-att-add-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.dd-att-add-bar .btn-outline {
+  font-size: 11.5px; padding: 6px 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.dd-att-upl {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border: 1px dashed var(--border-md); border-radius: 6px;
+  margin-bottom: 8px; font-size: 11px; color: var(--text-2); font-family: var(--mono);
+}
+.dd-att-upl-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+.dd-att-upl-bar { flex: 1; height: 3px; background: var(--bg-4); border-radius: 2px; overflow: hidden; }
+.dd-att-upl-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 2px; transition: width 150ms ease; }
+.dd-att-upl-pct { min-width: 34px; text-align: right; font-size: 10px; color: var(--text-3); }
+
+/* Drilldown lightbox */
+.dd-popup .dd-att-img { cursor: zoom-in; }
+.dd-lightbox {
+  display: none; position: fixed; inset: 0; z-index: 990;
+  background: rgba(4,4,12,0.92);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+.dd-lightbox.visible { display: flex; }
+.dd-lb-figure {
+  max-width: 86vw; max-height: 84vh; margin: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.dd-lb-img {
+  max-width: 86vw; max-height: 76vh; object-fit: contain;
+  border-radius: 8px; border: 1px solid var(--border-md);
+  box-shadow: 0 32px 96px rgba(0,0,0,0.7);
+}
+.dd-lb-cap { font-size: 12.5px; color: var(--text-2); text-align: center; max-width: 70vw; line-height: 1.6; }
+.dd-lb-nav {
+  position: fixed; top: 50%; transform: translateY(-50%);
+  width: 42px; height: 42px; border-radius: 50%;
+  background: rgba(14,14,32,0.85); border: 1px solid var(--accent-border);
+  color: var(--accent-lt); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--ease), border-color var(--ease);
+}
+.dd-lb-nav:hover { background: var(--accent-muted); border-color: var(--accent); }
+.dd-lb-prev { left: 26px; }
+.dd-lb-next { right: 26px; }
+.dd-lb-close {
+  position: fixed; top: 18px; right: 24px;
+  background: none; border: none; color: var(--text-2); cursor: pointer;
+  font-size: 26px; line-height: 1; font-family: var(--font); padding: 6px;
+  transition: color var(--ease);
+}
+.dd-lb-close:hover { color: var(--text-1); }
+.dd-lb-counter {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 11px; color: var(--text-2);
+  letter-spacing: 0.1em; background: rgba(14,14,32,0.8);
+  border: 1px solid var(--border); border-radius: 20px; padding: 5px 14px;
+}
+@media (max-width: 800px) {
+  .dd-lb-prev { left: 10px; }
+  .dd-lb-next { right: 10px; }
+}
+
 /* Mobile */
 .mobile-bar {
   display: none; position: fixed; top: 0; left: 0; right: 0;
@@ -928,6 +992,7 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 
 <script>
 /* ── FIREBASE INIT ─────────────────────────────────── */
@@ -941,6 +1006,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const storage = firebase.storage();
 
 /* ── STATE ─────────────────────────────────────────── */
 const S = {
@@ -1784,6 +1850,21 @@ const DD = (() => {
     return /^https?:\/\//i.test(u) ? u : '';
   }
 
+  /* true when the URL points at a file we uploaded to Firebase Storage */
+  function isStored(url) { return /firebasestorage\.googleapis\.com/i.test(url || ''); }
+
+  /* derive a readable filename from a URL (handles Storage's encoded paths) */
+  function fileNameFromUrl(url) {
+    try {
+      const u = new URL(url);
+      const name = decodeURIComponent(u.pathname).split('/').pop();
+      if (name && name.includes('.')) return name;
+    } catch (e) {}
+    return '';
+  }
+
+  function attLabel(a, url) { return a.caption || fileNameFromUrl(url) || url; }
+
   function fieldAtts(data, f) {
     const list = data[f + 'Media'];
     return Array.isArray(list) ? list.filter(a => a && safeUrl(a.url)) : [];
@@ -1809,12 +1890,15 @@ const DD = (() => {
       return '<div><img class="dd-att-img" src="' + escT(url) + '" loading="lazy" alt="' + escT(a.caption || 'attachment') + '">' + cap + '</div>';
     }
     if (a.type === 'video') {
-      const emb = videoEmbed(url);
+      /* YouTube/Vimeo embed for external URLs; HTML5 player for direct files
+         (extension match or uploaded-to-Storage files, whose MIME we trusted) */
+      const emb = videoEmbed(url) ||
+        (isStored(url) ? '<video class="dd-att-frame" controls preload="metadata" src="' + escT(url) + '"></video>' : null);
       if (emb) return '<div>' + emb + cap + '</div>';
-      return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + ICON_PLAY + '<span>' + escT(a.caption || url) + '</span></a>';
+      return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + ICON_PLAY + '<span>' + escT(attLabel(a, url)) + '</span></a>';
     }
     const icon = a.type === 'document' ? ICON_DOC : ICON_LINK;
-    return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + icon + '<span>' + escT(a.caption || url) + '</span></a>';
+    return '<a class="dd-att-link" href="' + escT(url) + '" target="_blank" rel="noopener noreferrer">' + icon + '<span>' + escT(attLabel(a, url)) + '</span></a>';
   }
 
   function attachmentsHTML(items) {
@@ -2003,6 +2087,79 @@ const DD = (() => {
   }
   function startLoop() { if (!rafId) rafId = requestAnimationFrame(tick); }
 
+  /* ── lightbox (image carousel per field) ───────────── */
+  let lb = null, lbItems = [], lbIdx = 0;
+
+  function buildLightbox() {
+    lb = document.createElement('div');
+    lb.className = 'dd-lightbox';
+    lb.innerHTML =
+      '<button class="dd-lb-close" aria-label="Close">×</button>' +
+      '<button class="dd-lb-nav dd-lb-prev" aria-label="Previous image"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3L5 8l5 5"/></svg></button>' +
+      '<figure class="dd-lb-figure"><img class="dd-lb-img" alt=""><figcaption class="dd-lb-cap"></figcaption></figure>' +
+      '<button class="dd-lb-nav dd-lb-next" aria-label="Next image"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3l5 5-5 5"/></svg></button>' +
+      '<div class="dd-lb-counter"></div>';
+    document.body.appendChild(lb);
+    lb.querySelector('.dd-lb-close').addEventListener('click', closeLightbox);
+    lb.querySelector('.dd-lb-prev').addEventListener('click', e => { e.stopPropagation(); lbNav(-1); });
+    lb.querySelector('.dd-lb-next').addEventListener('click', e => { e.stopPropagation(); lbNav(1); });
+    /* click outside the image (backdrop / empty space) closes */
+    lb.addEventListener('click', e => {
+      if (!e.target.closest('.dd-lb-img, .dd-lb-nav, .dd-lb-cap, .dd-lb-counter')) closeLightbox();
+    });
+  }
+
+  function lightboxOpen() { return !!(lb && lb.classList.contains('visible')); }
+
+  function openLightbox(items, idx) {
+    if (!items.length) return;
+    if (!lb) buildLightbox();
+    lbItems = items;
+    lbIdx = Math.min(Math.max(0, idx), items.length - 1);
+    lb.classList.add('visible');
+    lbRender();
+  }
+
+  function lbRender() {
+    const it = lbItems[lbIdx];
+    const img = lb.querySelector('.dd-lb-img');
+    img.src = it.url;
+    img.alt = it.caption || 'attachment';
+    const capEl = lb.querySelector('.dd-lb-cap');
+    capEl.textContent = it.caption || '';
+    capEl.style.display = it.caption ? '' : 'none';
+    const multi = lbItems.length > 1;
+    lb.querySelector('.dd-lb-prev').style.display = multi ? '' : 'none';
+    lb.querySelector('.dd-lb-next').style.display = multi ? '' : 'none';
+    const ctr = lb.querySelector('.dd-lb-counter');
+    ctr.style.display = multi ? '' : 'none';
+    ctr.textContent = (lbIdx + 1) + ' / ' + lbItems.length;
+  }
+
+  function lbNav(dir) {
+    if (lbItems.length < 2) return;
+    lbIdx = (lbIdx + dir + lbItems.length) % lbItems.length;
+    lbRender();
+  }
+
+  function closeLightbox() {
+    if (lb) lb.classList.remove('visible');
+    lbItems = [];
+  }
+
+  /* open the lightbox for a clicked popup image, carousel = all images
+     of the SAME field (its .dd-sec); other attachment types excluded */
+  function openLightboxFromImg(imgEl) {
+    const sec = imgEl.closest('.dd-sec');
+    const imgs = sec ? [...sec.querySelectorAll('.dd-att-img')] : [imgEl];
+    const items = imgs.map(el => ({
+      url: el.src,
+      caption: (el.nextElementSibling && el.nextElementSibling.classList.contains('dd-att-cap'))
+        ? el.nextElementSibling.textContent : ''
+    }));
+    openLightbox(items, imgs.indexOf(imgEl));
+  }
+
   /* ── admin: drilldown tab ──────────────────────────── */
   function pageDocs() {
     return Object.entries(docs)
@@ -2100,7 +2257,10 @@ const DD = (() => {
       '<details class="dd-att-adm"' + (atts.length ? ' open' : '') + '><summary>Attachments (' + atts.length + ')</summary>' +
         '<div class="dd-att-adm-inner" id="dd-att-' + f + '">' +
           '<div class="dd-att-rows">' + atts.map(attRowHTML).join('') + '</div>' +
-          '<button class="btn-add-spec" onclick="DD.admAddAtt(\'' + f + '\')">+ Add attachment</button>' +
+          '<div class="dd-att-add-bar">' +
+            '<button class="btn-outline" onclick="DD.admUploadFile(\'' + f + '\')"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 11V3M4.5 6.5L8 3l3.5 3.5M3 13.5h10"/></svg>Upload file</button>' +
+            '<button class="btn-outline" style="color:var(--text-3)" onclick="DD.admAddAtt(\'' + f + '\')">+ Or paste URL</button>' +
+          '</div>' +
         '</div></details>' +
       '</div>';
     };
@@ -2186,11 +2346,88 @@ const DD = (() => {
 
   function collectAtts(f) {
     const rows = document.querySelectorAll('#dd-att-' + f + ' .dd-att-row');
-    return [...rows].map(row => ({
-      type:    row.querySelector('.dd-att-type').value,
-      url:     row.querySelector('.dd-att-url').value.trim(),
-      caption: row.querySelector('.dd-att-cap').value.trim()
-    })).filter(a => a.url);
+    return [...rows]
+      .filter(row => row.querySelector('.dd-att-url'))
+      .map(row => ({
+        type:    row.querySelector('.dd-att-type').value,
+        url:     row.querySelector('.dd-att-url').value.trim(),
+        caption: row.querySelector('.dd-att-cap').value.trim()
+      })).filter(a => a.url);
+  }
+
+  /* ── file upload (Firebase Storage) ────────────────── */
+  let uploadField = null;
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*,video/*,application/pdf';
+  fileInput.multiple = true;
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+  fileInput.addEventListener('change', () => {
+    const files = [...fileInput.files];
+    fileInput.value = '';
+    files.forEach(file => startUpload(uploadField, file));
+  });
+
+  function admUploadFile(f) {
+    uploadField = f;
+    fileInput.click();
+  }
+
+  function typeFromMime(mime) {
+    if (/^image\//.test(mime)) return 'image';
+    if (/^video\//.test(mime)) return 'video';
+    if (mime === 'application/pdf') return 'document';
+    return 'link';
+  }
+
+  function startUpload(f, file) {
+    const inner = document.getElementById('dd-att-' + f);
+    if (!inner || !adm.editId || !file) return;
+    const wrap = inner.querySelector('.dd-att-rows');
+    const det = inner.closest('details');
+    if (det) det.open = true;
+
+    const row = document.createElement('div');
+    row.className = 'dd-att-upl';
+    row.innerHTML =
+      '<span class="dd-att-upl-name" title="' + escT(file.name) + '">' + escT(file.name) + '</span>' +
+      '<div class="dd-att-upl-bar"><div class="dd-att-upl-fill"></div></div>' +
+      '<span class="dd-att-upl-pct">0%</span>';
+    wrap.appendChild(row);
+
+    const path = 'drilldown/' + adm.editId + '/' + f + '/' + file.name.replace(/[^\w.\-]+/g, '_');
+    const task = storage.ref(path).put(file, { contentType: file.type || undefined });
+    task.on('state_changed',
+      snap => {
+        const pct = snap.totalBytes ? Math.round(snap.bytesTransferred / snap.totalBytes * 100) : 0;
+        row.querySelector('.dd-att-upl-fill').style.width = pct + '%';
+        row.querySelector('.dd-att-upl-pct').textContent = pct + '%';
+      },
+      err => {
+        row.remove();
+        showToast('Upload failed: ' + err.message, 'error');
+      },
+      async () => {
+        try {
+          const url = await task.snapshot.ref.getDownloadURL();
+          if (!row.isConnected) return; /* edit view left mid-upload */
+          const tmp = document.createElement('div');
+          tmp.innerHTML = attRowHTML({ type: typeFromMime(file.type), url: url, caption: '' });
+          wrap.replaceChild(tmp.firstChild, row);
+          showToast('Uploaded — click "Save changes" to keep it.', 'success');
+        } catch (e) {
+          row.remove();
+          showToast('Upload finished but URL fetch failed: ' + e.message, 'error');
+        }
+      });
+  }
+
+  /* best-effort removal of Storage files whose references were deleted */
+  function deleteStored(urls) {
+    urls.filter(isStored).forEach(u => {
+      try { storage.refFromURL(u).delete().catch(() => {}); } catch (e) {}
+    });
   }
 
   function admMark() {
@@ -2230,14 +2467,26 @@ const DD = (() => {
   }
 
   async function admSaveDoc(id) {
+    const prev = docs[id] || {};
     const vals = {};
     FIELDS.forEach(f => {
       const ta = document.getElementById('dd-f-' + f);
       vals[f] = ta ? ta.value : '';
       if (document.getElementById('dd-att-' + f)) vals[f + 'Media'] = collectAtts(f);
     });
+    /* attachments removed in this save whose files live in Firebase Storage
+       must also be deleted from Storage, not just dereferenced */
+    const removedUrls = [];
+    FIELDS.forEach(f => {
+      if (!Array.isArray(vals[f + 'Media'])) return;
+      const kept = new Set(vals[f + 'Media'].map(a => a.url));
+      (Array.isArray(prev[f + 'Media']) ? prev[f + 'Media'] : []).forEach(a => {
+        if (a && a.url && !kept.has(a.url)) removedUrls.push(a.url);
+      });
+    });
     try {
       await db.collection('drilldown').doc(id).update(vals);
+      deleteStored(removedUrls);
       const page = (docs[id] && docs[id].page) || adm.page;
       const created = await ensureDocs(FIELDS.map(f => vals[f]), page);
       showToast(created ? 'Saved — ' + created + ' new nested entr' + (created === 1 ? 'y' : 'ies') + ' created.' : 'Saved.', 'success');
@@ -2249,6 +2498,14 @@ const DD = (() => {
 
   async function admDelete(id) {
     if (!confirm('Delete drilldown entry "' + id + '"? Its markers will be removed from all content. This cannot be undone.')) return;
+    /* capture the entry's uploaded files before the doc disappears */
+    const entryUrls = [];
+    const d0 = docs[id];
+    if (d0) FIELDS.forEach(f => {
+      (Array.isArray(d0[f + 'Media']) ? d0[f + 'Media'] : []).forEach(a => {
+        if (a && a.url) entryUrls.push(a.url);
+      });
+    });
     const open = '{{explore:' + id + '}}';
     const re = new RegExp('\\{\\{explore:' + id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\}\\}([\\s\\S]*?)\\{\\{\\/explore\\}\\}', 'g');
     try {
@@ -2274,6 +2531,7 @@ const DD = (() => {
       });
       batch.delete(db.collection('drilldown').doc(id));
       await batch.commit();
+      deleteStored(entryUrls);
       showToast('Entry deleted and markers removed.', 'success');
       adm.view = 'list'; adm.editId = null;
       renderAdmin();
@@ -2285,6 +2543,8 @@ const DD = (() => {
   listen();
 
   document.addEventListener('click', e => {
+    const img = e.target.closest('.dd-popup .dd-att-img');
+    if (img) { openLightboxFromImg(img); return; }
     const span = e.target.closest('.explorable');
     if (!span || span.classList.contains('dd-max')) return;
     e.preventDefault();
@@ -2292,6 +2552,12 @@ const DD = (() => {
   });
 
   document.addEventListener('keydown', e => {
+    if (lightboxOpen()) {
+      if (e.key === 'Escape') { closeLightbox(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); lbNav(1); }
+      else if (e.key === 'ArrowLeft')  { e.preventDefault(); lbNav(-1); }
+      return;
+    }
     if (e.key === 'Escape' && popups.size) {
       const last = [...popups.keys()].pop();
       closePopup(last);
@@ -2302,7 +2568,7 @@ const DD = (() => {
     enabledFor, renderRich, closeAll, renderAdmin,
     admSetPage, admSetSource, admSetField,
     admMark, admMarkField, admSaveSource, admSaveDoc,
-    admEdit, admBack, admDelete, admAddAtt
+    admEdit, admBack, admDelete, admAddAtt, admUploadFile
   };
 })();
 window.DD = DD;
