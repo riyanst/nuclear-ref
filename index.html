@@ -881,6 +881,260 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
   .admin-2col { grid-template-columns: 1fr; }
   .spec-row-adm { grid-template-columns: 1fr 1fr auto; }
 }
+
+/* ── GRAPH VIEW ────────────────────────────────────── */
+#gv-toggle-btn { margin: 0 10px 10px; border-radius: 6px; }
+@media (max-width: 767px) { #gv-toggle-btn { display: none !important; } }
+
+#graph-view {
+  display: none;
+  position: fixed;
+  top: 0; left: var(--sidebar-w);
+  width: calc(100vw - var(--sidebar-w));
+  height: 100vh;
+  background: var(--bg-0);
+  z-index: 50;
+  opacity: 0;
+  overflow: hidden;
+}
+
+#gv-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1200px;
+  perspective-origin: 50% 50%;
+}
+
+#gv-parallax {
+  transform-style: preserve-3d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#gv-stack {
+  position: relative;
+  width: 260px;
+  height: 340px;
+  transform-style: preserve-3d;
+}
+
+.gv-card {
+  position: absolute;
+  top: 0; left: 0;
+  width: 260px;
+  height: 340px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #0e0e22, #12122a);
+  border: 1px solid rgba(200,136,32,0.22);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.55);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  will-change: transform;
+  backface-visibility: hidden;
+  user-select: none;
+}
+.gv-card.gv-card-empty { border-color: rgba(255,255,255,0.06); }
+
+.gv-card-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.gv-card-empty .gv-card-eyebrow,
+.gv-card-empty .gv-card-title { opacity: 0.4; }
+
+.gv-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-1);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.gv-hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin: 0 0 12px;
+  flex-shrink: 0;
+}
+
+.gv-card-preview {
+  font-size: 11px;
+  color: #807970;
+  line-height: 1.6;
+  flex: 1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gv-pending-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: var(--bg-4);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.gv-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+.gv-status-populated { color: var(--accent); }
+.gv-status-empty { color: var(--text-3); }
+
+.gv-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gv-dot-amber { background: var(--accent); }
+.gv-dot-grey  { background: var(--text-3); }
+
+/* detail panel */
+#gv-detail {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-0);
+  display: none;
+  flex-direction: column;
+  padding: 48px 64px 48px;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateX(60px);
+}
+
+.gv-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  padding: 0;
+  margin-bottom: 36px;
+  flex-shrink: 0;
+  transition: color var(--ease);
+}
+.gv-back-btn:hover { color: var(--accent); }
+
+.gv-det-eyebrow {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.gv-det-heading {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+  margin-bottom: 28px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.gv-det-body {
+  font-size: 15px;
+  color: var(--text-2);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.gv-det-empty {
+  text-align: center;
+  padding: 60px 0;
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.gv-det-nav {
+  display: flex;
+  gap: 12px;
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.gv-det-nav-btn {
+  background: none;
+  border: 1px solid var(--border-md);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: color var(--ease), border-color var(--ease);
+}
+.gv-det-nav-btn:hover { color: var(--text-1); border-color: var(--accent-border); }
+
+.gv-spec-table {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 20px 0 28px;
+  flex-shrink: 0;
+}
+.gv-spec-cell { background: var(--bg-2); padding: 14px 16px; }
+.gv-spec-key { font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+.gv-spec-val { font-size: 13px; font-weight: 500; color: var(--text-1); font-family: var(--mono); }
+
+#gv-counter {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+#gv-counter.gv-counter-visible { opacity: 1; }
 </style>
 </head>
 <body>
@@ -967,6 +1221,15 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
         <span id="adminLockLabel">Admin</span>
       </button>
     </nav>
+
+    <button class="nav-item" id="gv-toggle-btn" onclick="GV && GV.toggle()">
+      <svg class="nav-icon" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1.5" width="12" height="2.5" rx="0.5" fill="currentColor" opacity="0.5"/>
+        <rect x="1" y="5.75" width="12" height="2.5" rx="0.5" fill="currentColor" opacity="0.75"/>
+        <rect x="1" y="10" width="12" height="2.5" rx="0.5" fill="currentColor"/>
+      </svg>
+      <span class="gv-btn-label">Graph View</span>
+    </button>
 
     <div class="sidebar-footer">
       <span style="font-size:10.5px;color:var(--text-3)">Early access</span>
@@ -1064,6 +1327,18 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
     </section>
 
   </main>
+
+  <!-- GRAPH VIEW -->
+  <div id="graph-view">
+    <div id="gv-scene">
+      <div id="gv-parallax">
+        <div id="gv-stack"></div>
+      </div>
+    </div>
+    <div id="gv-detail"></div>
+    <div id="gv-counter"></div>
+  </div>
+
 </div>
 
 <!-- Firebase SDKs -->
@@ -3074,6 +3349,410 @@ const RP = (() => {
   };
 })();
 window.RP = RP;
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   GRAPH VIEW — 3D stacked card deck interface
+   Self-contained module. Reads S.reactors (already loaded
+   from Firestore). No new Firestore reads.
+   ══════════════════════════════════════════════════════ */
+const GV = (() => {
+  const SECTIONS = [
+    { key: 'designOverview',      label: 'Design Overview' },
+    { key: 'keyMaterials',        label: 'Key Materials' },
+    { key: 'operatingConditions', label: 'Operating Conditions' },
+    { key: 'currentStatus',       label: 'Current Status' }
+  ];
+  const MAX_VISIBLE = 8;
+
+  let cards = [];
+  let focusIdx = 0;
+  let isOpen = false;
+  let inDetail = false;
+  let detailIdx = 0;
+  let parallaxTarget = { x: 0, y: 0 };
+  let parallaxCurrent = { x: 0, y: 0 };
+  let rafId = null;
+  let counterTimer = null;
+
+  /* ── helpers ─────────────────────────────────────── */
+  function e(s) {
+    return s == null ? '' : String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function getStack() { return el('gv-stack'); }
+  function getDetail() { return el('gv-detail'); }
+
+  /* ── card data ───────────────────────────────────── */
+  function buildCards() {
+    cards = [];
+    S.reactors.forEach(r => {
+      cards.push({ type: 'header', reactor: r });
+      SECTIONS.forEach(({ key, label }) => {
+        const text = r[key] || '';
+        cards.push({ type: 'section', reactor: r, key, label,
+          populated: text.trim().length > 0, text });
+      });
+    });
+  }
+
+  function cardHTML(card, idx) {
+    const r = card.reactor;
+    if (card.type === 'header') {
+      return `<div class="gv-card" data-idx="${idx}">
+        <div class="gv-card-eyebrow">${e(r.name)}</div>
+        <div class="gv-card-title">${e(r.name)}</div>
+        <hr class="gv-hr">
+        <div class="gv-card-preview">${e(r.fullName || '')}${r.statusLabel ? '\n\n' + e(r.statusLabel) : ''}</div>
+        <div class="gv-card-status gv-status-populated"><span class="gv-dot gv-dot-amber"></span>Reactor profile</div>
+      </div>`;
+    }
+    const preview = card.populated ? card.text.slice(0, 120) : 'Content pending';
+    return `<div class="gv-card${card.populated ? '' : ' gv-card-empty'}" data-idx="${idx}">
+      ${!card.populated ? '<div class="gv-pending-badge">Pending</div>' : ''}
+      <div class="gv-card-eyebrow">${e(r.name)}</div>
+      <div class="gv-card-title">${e(card.label)}</div>
+      <hr class="gv-hr">
+      <div class="gv-card-preview">${e(preview)}</div>
+      <div class="gv-card-status ${card.populated ? 'gv-status-populated' : 'gv-status-empty'}">
+        <span class="gv-dot ${card.populated ? 'gv-dot-amber' : 'gv-dot-grey'}"></span>${card.populated ? 'Populated' : 'Pending'}
+      </div>
+    </div>`;
+  }
+
+  /* ── transforms ──────────────────────────────────── */
+  function baseTransformFor(pos) {
+    return `translateZ(${-60 * pos}px) rotateY(${-6 * pos}deg) translateX(${pos * 24}px)`;
+  }
+
+  function targetOpacityFor(pos) {
+    return pos === 0 ? '1' : String(Math.max(0.15, 1 - pos * 0.15));
+  }
+
+  function applyTransforms(animate) {
+    const cardEls = getStack() ? getStack().querySelectorAll('.gv-card') : [];
+    const n = cards.length;
+    cardEls.forEach((cel, i) => {
+      const pos = (i - focusIdx + n) % n;
+      if (pos > MAX_VISIBLE) {
+        cel.style.transition = 'none';
+        cel.style.opacity = '0';
+        cel.style.pointerEvents = 'none';
+        return;
+      }
+      const baseT = baseTransformFor(pos);
+      cel.dataset.baseTransform = baseT;
+      cel.dataset.pos = pos;
+      cel.style.transition = animate
+        ? 'transform 350ms ease, opacity 350ms ease, border-color 220ms ease, box-shadow 220ms ease'
+        : 'none';
+      cel.style.transform = baseT;
+      cel.style.opacity = targetOpacityFor(pos);
+      cel.style.zIndex = String(100 - pos);
+      cel.style.pointerEvents = 'auto';
+      cel.style.borderColor = '';
+      cel.style.boxShadow = '';
+    });
+  }
+
+  /* ── render stack ────────────────────────────────── */
+  function renderStack() {
+    const stack = getStack();
+    if (!stack) return;
+    stack.innerHTML = cards.map((c, i) => cardHTML(c, i)).join('');
+    stack.style.transform = '';
+    stack.style.opacity = '1';
+
+    const n = cards.length;
+    const cardEls = stack.querySelectorAll('.gv-card');
+
+    /* set entry-animation starting state */
+    cardEls.forEach((cel, i) => {
+      const pos = (i - focusIdx + n) % n;
+      cel.dataset.pos = pos;
+      if (pos > MAX_VISIBLE) {
+        cel.style.opacity = '0';
+        cel.style.pointerEvents = 'none';
+        cel.style.zIndex = '0';
+        return;
+      }
+      const baseT = baseTransformFor(pos);
+      cel.dataset.baseTransform = baseT;
+      cel.style.transition = 'none';
+      cel.style.opacity = '0';
+      cel.style.transform = baseT + ' translateX(40px)';
+      cel.style.zIndex = String(100 - pos);
+      cel.style.pointerEvents = 'auto';
+    });
+
+    /* click */
+    cardEls.forEach(cel => {
+      cel.addEventListener('click', () => {
+        if (inDetail) return;
+        openDetail(parseInt(cel.dataset.idx));
+      });
+    });
+
+    /* hover — per card mouseenter */
+    cardEls.forEach(cel => {
+      cel.addEventListener('mouseenter', () => {
+        if (inDetail) return;
+        const base = cel.dataset.baseTransform || '';
+        cel.style.transition = 'transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease, opacity 220ms ease';
+        cel.style.transform = base + ' scale(1.08)';
+        cel.style.borderColor = 'rgba(200,136,32,0.65)';
+        cel.style.boxShadow = '0 16px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,136,32,0.3)';
+        cel.style.opacity = '1';
+        cardEls.forEach(other => {
+          if (other !== cel) {
+            other.style.transition = 'opacity 220ms ease';
+            other.style.opacity = '0.55';
+          }
+        });
+      });
+    });
+
+    /* hover — stack mouseleave resets all */
+    stack.addEventListener('mouseleave', () => {
+      if (inDetail) return;
+      applyTransforms(true);
+    });
+  }
+
+  /* ── parallax RAF ────────────────────────────────── */
+  function parallaxLoop() {
+    parallaxCurrent.x += (parallaxTarget.x - parallaxCurrent.x) * 0.06;
+    parallaxCurrent.y += (parallaxTarget.y - parallaxCurrent.y) * 0.06;
+    const pw = el('gv-parallax');
+    if (pw && isOpen && !inDetail) {
+      pw.style.transform =
+        `rotateY(${parallaxCurrent.x.toFixed(3)}deg) rotateX(${parallaxCurrent.y.toFixed(3)}deg)`;
+    }
+    rafId = requestAnimationFrame(parallaxLoop);
+  }
+
+  function onMouseMove(ev) {
+    if (inDetail) return;
+    const gv = el('graph-view');
+    if (!gv) return;
+    const rect = gv.getBoundingClientRect();
+    parallaxTarget.x = ((ev.clientX - (rect.left + rect.width  / 2)) / rect.width)  *  4;
+    parallaxTarget.y = -((ev.clientY - (rect.top  + rect.height / 2)) / rect.height) *  2;
+  }
+
+  /* ── scroll ──────────────────────────────────────── */
+  function onWheel(ev) {
+    if (inDetail || !isOpen) return;
+    ev.preventDefault();
+    focusIdx = (focusIdx + (ev.deltaY > 0 ? 1 : -1) + cards.length) % cards.length;
+    applyTransforms(true);
+    showCounter();
+  }
+
+  function showCounter() {
+    const counter = el('gv-counter');
+    if (!counter) return;
+    counter.textContent = `${focusIdx + 1} / ${cards.length}`;
+    counter.classList.add('gv-counter-visible');
+    clearTimeout(counterTimer);
+    counterTimer = setTimeout(() => counter.classList.remove('gv-counter-visible'), 2000);
+  }
+
+  /* ── detail panel ────────────────────────────────── */
+  function openDetail(idx) {
+    detailIdx = idx;
+    inDetail = true;
+    const stack = getStack();
+    const detail = getDetail();
+    if (!stack || !detail) return;
+
+    /* reset parallax wrapper so it doesn't compound with slide */
+    const pw = el('gv-parallax');
+    if (pw) pw.style.transform = '';
+    parallaxTarget = { x: 0, y: 0 };
+    parallaxCurrent = { x: 0, y: 0 };
+
+    /* slide stack out right */
+    stack.style.transition = 'transform 300ms ease-in, opacity 300ms ease-in';
+    stack.style.transform = 'translateX(120vw)';
+    stack.style.opacity = '0';
+
+    renderDetailPanel(cards[idx]);
+    detail.style.display = 'flex';
+    detail.style.opacity = '0';
+    detail.style.transform = 'translateX(60px)';
+    detail.style.transition = 'none';
+
+    setTimeout(() => {
+      detail.style.transition = 'opacity 300ms ease, transform 300ms ease';
+      detail.style.opacity = '1';
+      detail.style.transform = 'translateX(0)';
+    }, 120);
+  }
+
+  function renderDetailPanel(card) {
+    const detail = getDetail();
+    const r = card.reactor;
+    let inner = '';
+
+    if (card.type === 'header') {
+      const specsHTML = r.specs && r.specs.length
+        ? `<div class="gv-spec-table">${r.specs.map(s =>
+            `<div class="gv-spec-cell"><div class="gv-spec-key">${e(s.key)}</div><div class="gv-spec-val">${e(s.value)}</div></div>`
+          ).join('')}</div>`
+        : '';
+      const pillClass = 'pill-' + (r.statusType || 'historical');
+      inner = `
+        <div class="gv-det-eyebrow">${e(r.name)}</div>
+        <div class="gv-det-heading">${e(r.fullName || r.name)}</div>
+        <span class="status-pill ${pillClass}"><span class="pill-dot"></span>${e(r.statusLabel || '')}</span>
+        ${specsHTML}`;
+    } else {
+      inner = `
+        <div class="gv-det-eyebrow">${e(r.name)}</div>
+        <div class="gv-det-heading">${e(card.label)}</div>
+        ${card.populated
+          ? `<div class="gv-det-body">${e(card.text)}</div>`
+          : `<div class="gv-det-empty">No content yet. Add it in the Admin panel.</div>`}`;
+    }
+
+    detail.innerHTML = `
+      <button class="gv-back-btn" id="gv-back-btn">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 2L3.5 6l4 4"/></svg>
+        ← All cards
+      </button>
+      ${inner}
+      <div class="gv-det-nav">
+        <button class="gv-det-nav-btn" id="gv-prev-btn">← Previous card</button>
+        <button class="gv-det-nav-btn" id="gv-next-btn">Next card →</button>
+      </div>`;
+
+    el('gv-back-btn').addEventListener('click', closeDetail);
+    el('gv-prev-btn').addEventListener('click', () => {
+      detailIdx = (detailIdx - 1 + cards.length) % cards.length;
+      renderDetailPanel(cards[detailIdx]);
+    });
+    el('gv-next-btn').addEventListener('click', () => {
+      detailIdx = (detailIdx + 1) % cards.length;
+      renderDetailPanel(cards[detailIdx]);
+    });
+  }
+
+  function closeDetail() {
+    inDetail = false;
+    const stack = getStack();
+    const detail = getDetail();
+
+    /* slide detail out right */
+    detail.style.transition = 'opacity 300ms ease, transform 300ms ease';
+    detail.style.opacity = '0';
+    detail.style.transform = 'translateX(60px)';
+
+    /* position stack off-left instantly, then slide in */
+    stack.style.transition = 'none';
+    stack.style.transform = 'translateX(-120vw)';
+    stack.style.opacity = '0';
+
+    setTimeout(() => {
+      detail.style.display = 'none';
+      applyTransforms(false);
+      stack.style.transition = 'transform 300ms ease, opacity 300ms ease';
+      stack.style.transform = '';
+      stack.style.opacity = '1';
+    }, 300);
+  }
+
+  /* ── open / close / toggle ───────────────────────── */
+  function open() {
+    buildCards();
+    const gv   = el('graph-view');
+    const main = el('mainContent');
+    if (!gv || !main) return;
+
+    gv.style.opacity = '0';
+    gv.style.transition = 'none';
+    gv.style.display = 'block';
+    main.style.display = 'none';
+
+    isOpen = true;
+    inDetail = false;
+    focusIdx = 0;
+    parallaxTarget = { x: 0, y: 0 };
+    parallaxCurrent = { x: 0, y: 0 };
+
+    const btn = el('gv-toggle-btn');
+    if (btn) btn.querySelector('.gv-btn-label').textContent = 'Document View';
+
+    renderStack();
+
+    requestAnimationFrame(() => {
+      /* fade in container */
+      gv.style.transition = 'opacity 350ms ease';
+      gv.style.opacity = '1';
+
+      /* staggered card entry */
+      const cardEls = getStack() ? getStack().querySelectorAll('.gv-card') : [];
+      cardEls.forEach(cel => {
+        const pos = parseInt(cel.dataset.pos || 0);
+        if (pos > MAX_VISIBLE) return;
+        const baseT = cel.dataset.baseTransform || '';
+        setTimeout(() => {
+          cel.style.transition = 'transform 400ms ease, opacity 400ms ease';
+          cel.style.transform = baseT;
+          cel.style.opacity = targetOpacityFor(pos);
+        }, pos * 50);
+      });
+
+      /* start parallax RAF */
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(parallaxLoop);
+    });
+  }
+
+  function close() {
+    const gv   = el('graph-view');
+    const main = el('mainContent');
+    if (!gv) return;
+
+    gv.style.transition = 'opacity 350ms ease';
+    gv.style.opacity = '0';
+    isOpen = false;
+    inDetail = false;
+
+    const btn = el('gv-toggle-btn');
+    if (btn) btn.querySelector('.gv-btn-label').textContent = 'Graph View';
+
+    setTimeout(() => {
+      gv.style.display = 'none';
+      if (main) main.style.display = '';
+      const detail = getDetail();
+      if (detail) { detail.style.display = 'none'; detail.innerHTML = ''; }
+    }, 350);
+
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    parallaxTarget = { x: 0, y: 0 };
+    parallaxCurrent = { x: 0, y: 0 };
+    const pw = el('gv-parallax');
+    if (pw) pw.style.transform = '';
+  }
+
+  function toggle() { if (isOpen) close(); else open(); }
+
+  /* ── init ────────────────────────────────────────── */
+  function init() {
+    const gv = el('graph-view');
+    if (!gv) return;
+    gv.addEventListener('wheel', onWheel, { passive: false });
+    gv.addEventListener('mousemove', onMouseMove);
+  }
+
+  init();
+  return { open, close, toggle };
+})();
+window.GV = GV;
 </script>
 </body>
 </html>
