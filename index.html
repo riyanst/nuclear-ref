@@ -1330,13 +1330,21 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 
   <!-- GRAPH VIEW -->
   <div id="graph-view">
-    <div id="gv-scene">
+    <!-- card stack suppressed pending completion -->
+    <div id="gv-scene" style="display:none">
       <div id="gv-parallax">
         <div id="gv-stack"></div>
       </div>
     </div>
-    <div id="gv-detail"></div>
-    <div id="gv-counter"></div>
+    <div id="gv-detail" style="display:none"></div>
+    <div id="gv-counter" style="display:none"></div>
+
+    <!-- coming soon placeholder -->
+    <div id="gv-coming-soon" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;pointer-events:none">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:#C88820;margin-bottom:14px">Graph View</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:500;color:#EDEAE2;line-height:1.1">Coming Soon</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#807970;margin-top:8px">This view is under development</div>
+    </div>
   </div>
 
 </div>
