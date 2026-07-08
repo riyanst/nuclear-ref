@@ -882,6 +882,65 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
   .spec-row-adm { grid-template-columns: 1fr 1fr auto; }
 }
 
+/* ── ADMIN UNSAVED-CHANGES MODAL ──────────────────── */
+#adm-dirty-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1050;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+#adm-dirty-modal.adm-visible { opacity: 1; }
+
+.adm-dirty-box {
+  background: var(--bg-2);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  padding: 28px 32px;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+.adm-dirty-title {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.adm-dirty-body {
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.65;
+  margin-bottom: 24px;
+}
+
+.adm-dirty-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* ── REFERENCES SCROLLABLE LIST ────────────────────── */
+#ref-adm-list {
+  max-height: 420px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--bg-2);
+  position: relative;
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+#ref-adm-list::-webkit-scrollbar { width: 4px; }
+#ref-adm-list::-webkit-scrollbar-track { background: var(--bg-2); }
+#ref-adm-list::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
 /* ── GRAPH VIEW ────────────────────────────────────── */
 #gv-toggle-btn { margin: 0 10px 10px; border-radius: 6px; }
 @media (max-width: 767px) { #gv-toggle-btn { display: none !important; } }
@@ -1169,6 +1228,18 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- Unsaved changes modal -->
+<div id="adm-dirty-modal">
+  <div class="adm-dirty-box">
+    <div class="adm-dirty-title">Unsaved Changes</div>
+    <div class="adm-dirty-body">You have unsaved changes that will be lost if you leave this section. Save your changes before continuing.</div>
+    <div class="adm-dirty-actions">
+      <button class="btn-ghost" onclick="admDirtyLeave()">Leave Anyway</button>
+      <button class="btn-primary" onclick="admDirtyStay()">Stay and Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="layout">
 
@@ -3761,6 +3832,114 @@ const GV = (() => {
   return { open, close, toggle };
 })();
 window.GV = GV;
+</script>
+
+<script>
+/* ── ADMIN UNSAVED-CHANGES WARNING ─────────────────── */
+(function () {
+  let isDirty = false;
+  let pendingAction = null;
+
+  /* ── track dirty state ─────────────────────────────── */
+  const adminContent = document.getElementById('admin-content');
+  if (adminContent) {
+    adminContent.addEventListener('input',  () => { if (S.isAdmin) isDirty = true; }, true);
+    adminContent.addEventListener('change', () => { if (S.isAdmin) isDirty = true; }, true);
+    /* optimistically clear on any save-button click */
+    adminContent.addEventListener('click', e => {
+      if (e.target.closest('.btn-save')) isDirty = false;
+    }, true);
+  }
+
+  /* ── modal helpers ─────────────────────────────────── */
+  function showDirtyModal(action) {
+    pendingAction = action;
+    const modal = document.getElementById('adm-dirty-modal');
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => modal.classList.add('adm-visible'));
+  }
+
+  function hideDirtyModal() {
+    const modal = document.getElementById('adm-dirty-modal');
+    modal.classList.remove('adm-visible');
+    setTimeout(() => { modal.style.display = 'none'; }, 200);
+  }
+
+  window.admDirtyStay = function () {
+    hideDirtyModal();
+    pendingAction = null;
+  };
+
+  window.admDirtyLeave = function () {
+    hideDirtyModal();
+    isDirty = false;
+    if (pendingAction) { const a = pendingAction; pendingAction = null; a(); }
+  };
+
+  /* ── wrap navigation functions ─────────────────────── */
+  function guard(action) {
+    if (isDirty && S.isAdmin) {
+      showDirtyModal(() => { isDirty = false; action(); });
+      return true;
+    }
+    return false;
+  }
+
+  const _origSwitch = window.switchAdminTab;
+  window.switchAdminTab = function (tab, btn) {
+    if (guard(() => _origSwitch(tab, btn))) return;
+    _origSwitch(tab, btn);
+  };
+
+  const _origBackReactor = window.backToReactorList;
+  window.backToReactorList = function () {
+    if (guard(_origBackReactor)) return;
+    _origBackReactor();
+  };
+
+  const _origBackGlossary = window.backToGlossaryList;
+  window.backToGlossaryList = function () {
+    if (guard(_origBackGlossary)) return;
+    _origBackGlossary();
+  };
+
+  const _origShow = window.show;
+  window.show = function (sectionId) {
+    if (sectionId !== 'admin' && guard(() => _origShow(sectionId))) return;
+    _origShow(sectionId);
+  };
+
+  const _origSignOut = window.adminSignOut;
+  window.adminSignOut = function () {
+    isDirty = false;
+    _origSignOut();
+  };
+
+  /* wrap module back-buttons after modules are defined */
+  if (window.DD && DD.admBack) {
+    const _origDDBack = DD.admBack;
+    DD.admBack = function () {
+      if (guard(_origDDBack)) return;
+      _origDDBack();
+    };
+  }
+
+  if (window.RP && RP.admBack) {
+    const _origRPBack = RP.admBack;
+    RP.admBack = function () {
+      if (guard(_origRPBack)) return;
+      _origRPBack();
+    };
+  }
+
+  /* ── beforeunload ──────────────────────────────────── */
+  window.addEventListener('beforeunload', e => {
+    if (isDirty && S.isAdmin) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+})();
 </script>
 </body>
 </html>
