@@ -536,6 +536,73 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 }
 .forge-backlink:hover { background: rgba(245, 158, 11, 0.11); }
 
+/* Versions accordion */
+.fs-ver-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 12px; overflow: hidden;
+}
+.fs-ver-card.open { border-color: var(--accent-border); }
+.fs-ver-header {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 18px 20px; background: none; border: none; cursor: pointer;
+  text-align: left; color: inherit; font-family: inherit;
+}
+.fs-ver-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+.fs-ver-header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.fs-ver-tag {
+  font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500;
+  color: var(--accent-lt);
+}
+.fs-ver-title { font-size: 15px; font-weight: 500; color: var(--text-1); }
+.fs-ver-chevron { color: var(--text-3); transition: transform 300ms ease; flex-shrink: 0; }
+.fs-ver-card.open .fs-ver-chevron { transform: rotate(180deg); }
+.fs-ver-body { max-height: 0; overflow: hidden; transition: max-height 300ms ease; }
+.fs-ver-body-inner { padding: 4px 20px 22px; border-top: 1px solid var(--border); }
+.fs-ver-objective { font-size: 14px; color: var(--text-2); line-height: 1.75; margin: 18px 0; white-space: pre-wrap; }
+
+/* Status pills */
+.fs-status-pill {
+  display: inline-block; font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.05em; padding: 4px 11px; border-radius: 20px;
+  font-family: 'IBM Plex Mono', monospace; white-space: nowrap;
+}
+.fs-pill-progress { color: var(--accent-lt); background: var(--accent-muted); border: 1px solid var(--accent-border); }
+.fs-pill-complete { color: #5bbd7a; background: rgba(91,189,122,0.1); border: 1px solid rgba(91,189,122,0.28); }
+.fs-pill-pending  { color: var(--text-2); background: rgba(255,255,255,0.04); border: 1px solid var(--border-md); }
+
+/* Parameters table (3-col, spec-table styling) */
+.fs-param-table {
+  display: grid; grid-template-columns: 1fr 1.3fr 1.3fr;
+  gap: 1px; background: var(--border); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; margin: 20px 0;
+}
+.fs-param-cell { background: var(--bg-2); padding: 12px 14px; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+.fs-param-head { font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); background: var(--bg-3); }
+.fs-param-label { font-weight: 500; color: var(--text-1); font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
+
+.fs-ver-canvas { margin: 20px 0; }
+.fs-ver-canvas-thumb { max-width: 220px; width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.fs-ver-canvas-label { font-size: 11px; color: var(--text-3); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
+.fs-ver-notes { font-size: 13px; color: var(--text-3); font-style: italic; line-height: 1.7; white-space: pre-wrap; margin: 18px 0; }
+.fs-ver-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+@media (max-width: 640px) {
+  .fs-param-table { grid-template-columns: 1fr; }
+  .fs-param-head:nth-child(2), .fs-param-head:nth-child(3) { display: none; }
+}
+
+/* Return to FORGE button (fixed, appears after a FORGE→TRACE deep link) */
+#forge-return-btn {
+  position: fixed; bottom: 24px; left: 24px; z-index: 950;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: #1a1206; border: none;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 11px 18px; border-radius: 24px; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45); transition: var(--ease);
+}
+#forge-return-btn:hover { background: var(--accent-lt); box-shadow: 0 10px 30px rgba(0,0,0,0.55); }
+@media (max-width: 767px) { #forge-return-btn { bottom: 16px; left: 16px; font-size: 12px; padding: 10px 15px; } }
+
 /* Admin sub-card within admin-content */
 .fs-adm-card {
   background: var(--bg-2); border: 1px solid var(--border);
@@ -1936,6 +2003,36 @@ async function seedIfNeeded() {
       });
     }
   } catch (e) { console.warn('Design canvas seed error:', e); }
+
+  /* Seed Versions (subsections doc, new schema) — pre-populate Version 3 once */
+  try {
+    const vSnap = await db.collection('future_scope').doc('subsections').get();
+    const vData = vSnap.exists ? (vSnap.data() || {}) : {};
+    const vItems = vData.items || [];
+    if (!vData.seeded && vItems.length === 0) {
+      await db.collection('future_scope').doc('subsections').set({
+        seeded: true,
+        items: [{
+          id: 'v3',
+          versionNumber: 'v3',
+          title: 'Version 3 — Conceptual Baseline',
+          objective: 'Establish physical geometry. Confirm that a compact toroidal fusion chamber with transparent outer casing and output terminal can be modelled and rendered. No plasma physics required at this stage — pure geometry and materials selection.',
+          status: 'In Progress',
+          designCanvasVersion: 'v3',
+          parameters: [
+            { label: 'Core temperature',      traceValue: '2,500K (NERVA fission core)',              forgeTarget: '150,000,000K (D-T plasma ignition)' },
+            { label: 'Confinement method',    traceValue: 'Graphite matrix + beryllium reflector',    forgeTarget: 'Toroidal magnetic field' },
+            { label: 'Fuel state',            traceValue: 'Solid uranium in graphite',                forgeTarget: 'D-T plasma (gas)' },
+            { label: 'Energy output',         traceValue: '4,500 MWt demonstrated (NERVA)',           forgeTarget: 'Target: >500 MWt (fusion)' },
+            { label: 'Confinement duration',  traceValue: 'Continuous (solid fuel)',                  forgeTarget: 'Target: sustained burn >100s' },
+            { label: 'Reactor geometry',      traceValue: 'Cylindrical core (NERVA)',                 forgeTarget: 'Toroidal chamber, major r: 0.7m, minor r: 0.32m' }
+          ],
+          notes: 'Version 3 is the first physical model. Terminal position and torus proportions are the active geometry problems. Plasma physics parameters are targets only — not yet engineered.',
+          lastUpdated: new Date().toISOString()
+        }]
+      }, { merge: true });
+    }
+  } catch (e) { console.warn('Versions seed error:', e); }
 }
 
 /* ── LOAD ──────────────────────────────────────────── */
@@ -2108,16 +2205,11 @@ function renderFuture() {
     html += '</div>';
   }
 
-  /* 5. Subsections */
+  /* 5. Versions — accordion below Convergence */
   if (subs.length) {
-    html += '<hr class="fs-divider">';
-    subs.forEach((sub, i) => {
-      html += '<div class="fs-subsection">';
-      if (sub.imageURL) html += '<img src="' + esc(sub.imageURL) + '" alt="' + esc(sub.title || '') + '">';
-      if (sub.title) html += '<div class="fs-subsection-title">' + esc(sub.title) + '</div>';
-      if (sub.body)  html += '<div class="fs-subsection-body">' + esc(sub.body) + '</div>';
-      html += '</div>';
-      if (i < subs.length - 1) html += '<hr class="fs-divider">';
+    html += '<h2 class="fs-canvas-heading" style="margin-top:48px">Versions</h2>';
+    subs.forEach((v, i) => {
+      html += renderVersionCard(v, i, dc);
     });
   }
 
@@ -2127,6 +2219,74 @@ function renderFuture() {
 
   el.innerHTML = html;
 }
+
+/* status → pill class map */
+function fsStatusPill(status) {
+  const s = status || 'Pending';
+  const cls = s === 'Complete' ? 'fs-pill-complete'
+            : s === 'In Progress' ? 'fs-pill-progress'
+            : 'fs-pill-pending';
+  return '<span class="fs-status-pill ' + cls + '">' + esc(s) + '</span>';
+}
+
+/* one Versions accordion card */
+function renderVersionCard(v, i, dc) {
+  const ver = v.versionNumber || '';
+  const params = v.parameters || [];
+  let body = '';
+
+  if (v.objective) body += '<p class="fs-ver-objective">' + esc(v.objective) + '</p>';
+
+  if (params.length) {
+    body += '<div class="fs-param-table">';
+    body += '<div class="fs-param-cell fs-param-head">Parameter</div>'
+          + '<div class="fs-param-cell fs-param-head">TRACE Demonstrated</div>'
+          + '<div class="fs-param-cell fs-param-head">FORGE Target</div>';
+    params.forEach(p => {
+      body += '<div class="fs-param-cell fs-param-label">' + esc(p.label || '') + '</div>'
+            + '<div class="fs-param-cell">' + esc(p.traceValue || '') + '</div>'
+            + '<div class="fs-param-cell">' + esc(p.forgeTarget || '') + '</div>';
+    });
+    body += '</div>';
+  }
+
+  /* Design Canvas thumbnail when the version links to the current canvas version */
+  if (v.designCanvasVersion && dc && dc.version && v.designCanvasVersion === dc.version && dc.imageURL) {
+    body += '<div class="fs-ver-canvas">'
+          + '<img class="fs-ver-canvas-thumb" src="' + esc(dc.imageURL) + '" alt="Design Canvas ' + esc(dc.version) + '">'
+          + '<div class="fs-ver-canvas-label">Design Canvas ' + esc(dc.version) + '</div>'
+          + '</div>';
+  }
+
+  if (v.notes) body += '<div class="fs-ver-notes">' + esc(v.notes) + '</div>';
+
+  body += '<div class="fs-ver-foot">' + fsStatusPill(v.status) + '</div>';
+
+  return `
+    <div class="fs-ver-card" id="fs-ver-card-${i}">
+      <button class="fs-ver-header" onclick="fsToggleVersion(${i})">
+        <span class="fs-ver-header-left">
+          <span class="fs-ver-tag">${esc(ver)}</span>
+          <span class="fs-ver-title">${esc(v.title || '')}</span>
+        </span>
+        <span class="fs-ver-header-right">
+          ${fsStatusPill(v.status)}
+          <svg class="fs-ver-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 5.5L7 9l3.5-3.5"/></svg>
+        </span>
+      </button>
+      <div class="fs-ver-body" id="fs-ver-body-${i}">
+        <div class="fs-ver-body-inner">${body}</div>
+      </div>
+    </div>`;
+}
+
+window.fsToggleVersion = function(i) {
+  const card = document.getElementById('fs-ver-card-' + i);
+  const body = document.getElementById('fs-ver-body-' + i);
+  if (!card || !body) return;
+  const open = card.classList.toggle('open');
+  body.style.maxHeight = open ? (body.scrollHeight + 40) + 'px' : '0px';
+};
 
 function renderAbout() {
   setHTML('about-whoBuiltThis',      renderText(S.about.whoBuiltThis));
@@ -2195,6 +2355,23 @@ function renderProfile(r) {
     <div class="profile-block" data-section="key-materials"><div class="block-label">Key materials</div>${rt(r.keyMaterials)}${rf('keyMaterials')}${fb('keyMaterials')}</div>
     <div class="profile-block" data-section="operating-conditions"><div class="block-label">Operating conditions</div>${rt(r.operatingConditions)}${rf('operatingConditions')}${fb('operatingConditions')}</div>
     <div class="profile-block" data-section="current-status"><div class="block-label">Current status</div>${rt(r.currentStatus)}${rf('currentStatus')}${fb('currentStatus')}</div>`;
+
+  /* FORGE→TRACE deep-link origin: show the persistent "Return to FORGE" button */
+  if (window.__forgeOrigin) injectForgeReturnBtn(); else removeForgeReturnBtn();
+}
+
+/* inject/remove the fixed "← Return to FORGE" button (bottom-left) */
+function injectForgeReturnBtn() {
+  if (document.getElementById('forge-return-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'forge-return-btn';
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7.5 2L3.5 6l4 4"/></svg><span>Return to FORGE</span>';
+  btn.onclick = triggerReturnToForge;
+  document.body.appendChild(btn);
+}
+function removeForgeReturnBtn() {
+  const b = document.getElementById('forge-return-btn');
+  if (b) b.remove();
 }
 
 function renderSidebarNav() {
@@ -2211,6 +2388,9 @@ function show(sectionId) {
   if (window.GV) GV.reset();   // never let the Graph View overlay block navigation
   if (window.DD) DD.closeAll();
   if (window.RP) RP.close();
+  /* clear the FORGE-origin state on any manual navigation (not the transition
+     landing itself, which is guarded by __ttNavigating) */
+  if (!window.__ttNavigating) { window.__forgeOrigin = false; removeForgeReturnBtn(); }
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item, .nav-sub-item').forEach(b => b.classList.remove('active'));
   const sec = document.getElementById(sectionId);
@@ -2249,30 +2429,28 @@ function navToReactorByName(name) {
 }
 window.navToReactorByName = navToReactorByName;
 
-/* ── FORGE → TRACE TERRITORY TRANSITION ────────────────
-   Elegant full-screen transition, then navigate to the
-   target reactor + section and highlight the sentence. */
+/* ── TERRITORY TRANSITION ──────────────────────────────
+   Elegant full-screen transition used in both directions:
+   FORGE→TRACE (forward) and TRACE→FORGE (return). */
 let __ttActive = false;
-function triggerTerritoryTransition(reactorId, sectionSlug, sentence) {
+function runTerritoryTransition(opts) {
   const ov = document.getElementById('territory-transition-overlay');
-  if (!ov) { doTraceNavigate(reactorId, sectionSlug, sentence); return; }
+  if (!ov) { if (opts.onComplete) opts.onComplete(); return; }
   if (__ttActive) return;   // ignore rapid re-clicks while a transition runs
   __ttActive = true;
-
-  const sec = traceSectionBySlug(sectionSlug);
-  const rn = reactorNameById(reactorId);
-  const secLabel = sec ? sec.label : (sectionSlug || '');
-
-  /* populate destination labels */
-  const destLabel = document.getElementById('tt-dest-label');
-  const destReactor = document.getElementById('tt-dest-reactor');
-  if (destLabel) destLabel.textContent = (rn + ' — ' + secLabel).toUpperCase();
-  if (destReactor) destReactor.textContent = rn;
 
   const topLabel = document.getElementById('tt-top-label');
   const centerText = document.getElementById('tt-center-text');
   const destWrap = document.getElementById('tt-dest-wrap');
+  const destLabel = document.getElementById('tt-dest-label');
+  const destReactor = document.getElementById('tt-dest-reactor');
   const lineWrap = document.getElementById('transition-line-wrap');
+
+  /* populate labels */
+  if (topLabel) topLabel.textContent = opts.topLabel;
+  if (centerText) centerText.textContent = opts.centerText;
+  if (destLabel) destLabel.textContent = opts.destLabel;
+  if (destReactor) destReactor.textContent = opts.destReactor;
 
   /* reset fade states + re-arm the line-draw animation */
   [topLabel, centerText, destWrap].forEach(el => el && el.classList.remove('tt-fade-in'));
@@ -2301,24 +2479,58 @@ function triggerTerritoryTransition(reactorId, sectionSlug, sentence) {
   /* 5. destination label (200ms fade, 700ms delay) */
   setTimeout(() => { if (destWrap) destWrap.classList.add('tt-fade-in'); }, 700);
 
-  /* 6. hold until ~900ms of content shown + 400ms hold, then 7. fade out (400ms) */
+  /* 6. hold, then 7. fade out (400ms) */
   setTimeout(() => {
     ov.classList.remove('tt-shown');   // fade out (400ms via CSS)
-    /* 8. on fade-out complete: navigate + highlight */
+    /* 8. on fade-out complete: run the completion action */
     setTimeout(() => {
       ov.classList.remove('tt-visible');
       __ttActive = false;
-      doTraceNavigate(reactorId, sectionSlug, sentence);
+      if (opts.onComplete) opts.onComplete();
     }, 400);
   }, 1300);
 }
+
+/* FORGE → TRACE: transition, then navigate + highlight the sentence */
+function triggerTerritoryTransition(reactorId, sectionSlug, sentence) {
+  window.__forgeOrigin = true;   // remember we arrived via the FORGE deep link
+  const sec = traceSectionBySlug(sectionSlug);
+  const rn = reactorNameById(reactorId);
+  const secLabel = sec ? sec.label : (sectionSlug || '');
+  runTerritoryTransition({
+    topLabel: 'Leaving FORGE Territory',
+    centerText: 'Tracing knowledge to TRACE…',
+    destLabel: (rn + ' — ' + secLabel).toUpperCase(),
+    destReactor: rn,
+    onComplete: () => doTraceNavigate(reactorId, sectionSlug, sentence)
+  });
+}
 window.triggerTerritoryTransition = triggerTerritoryTransition;
+
+/* TRACE → FORGE: reverse transition, then return to Future Scope */
+function triggerReturnToForge() {
+  runTerritoryTransition({
+    topLabel: 'Leaving TRACE Territory',
+    centerText: 'Returning to FORGE…',
+    destLabel: 'FUTURE SCOPE — FORGE CONCEPT',
+    destReactor: 'FORGE',
+    onComplete: () => {
+      window.__forgeOrigin = false;
+      removeForgeReturnBtn();
+      show('future');
+    }
+  });
+}
+window.triggerReturnToForge = triggerReturnToForge;
 
 /* navigate to reactor, then find + highlight the sentence */
 function doTraceNavigate(reactorId, sectionSlug, sentence) {
+  /* guard so show() doesn't clear __forgeOrigin during this landing */
+  window.__ttNavigating = true;
   const r = (S.reactors || []).find(x => x.id === reactorId);
   if (r) { navToReactor(r.id); }
   else { navToReactorByName(reactorId); }
+  window.__ttNavigating = false;
 
   if (!sentence || !String(sentence).trim()) return;
   /* wait 300ms for the profile to render */
@@ -2469,15 +2681,15 @@ function renderAdminFuture() {
     `<div class="admin-field"><label class="admin-label">${label}</label>
       <textarea class="admin-textarea" id="${id}" rows="${rows||5}">${esc(val||'')}</textarea></div>`;
 
-  const subsItems = subs.map((s, i) => `
-    <div class="fs-sub-item" id="fs-sub-item-${i}">
+  const verItems = subs.map((s, i) => `
+    <div class="fs-sub-item" id="fs-ver-item-${i}">
       <div class="fs-sub-item-info">
-        <div class="fs-sub-item-title">${esc(s.title||'(untitled)')}</div>
-        <div class="fs-sub-item-body">${esc(s.body||'')}</div>
+        <div class="fs-sub-item-title"><span style="font-family:'IBM Plex Mono',monospace;color:var(--accent-lt);margin-right:8px">${esc(s.versionNumber||'')}</span>${esc(s.title||'(untitled)')}</div>
+        <div class="fs-sub-item-body">${fsStatusPill(s.status)}</div>
       </div>
       <div class="admin-item-actions">
-        <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="fsEditSub(${i})">Edit</button>
-        <button class="btn-danger" style="font-size:11px;padding:5px 10px" onclick="fsDeleteSub(${i})">Delete</button>
+        <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="fsEditVersion(${i})">Edit</button>
+        <button class="btn-danger" style="font-size:11px;padding:5px 10px" onclick="fsDeleteVersion(${i})">Delete</button>
       </div>
     </div>`).join('');
 
@@ -2519,30 +2731,50 @@ function renderAdminFuture() {
       <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('convergence',['title','body'],['fs-cv-title','fs-cv-body'])">Save</button></div>
     </div>
 
-    <!-- Card 5: Subsections -->
+    <!-- Card 5: Versions -->
     <div class="fs-adm-card">
-      <div class="fs-adm-card-title">Subsections</div>
-      <div id="fs-sub-list">${subsItems || '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No subsections yet.</div>'}</div>
+      <div class="fs-adm-card-title">Versions</div>
+      <div id="fs-ver-list">${verItems || '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No versions yet.</div>'}</div>
       <div style="margin-top:16px">
-        <button class="btn-outline" style="font-size:12px" onclick="fsShowAddSub()">+ Add Subsection</button>
+        <button class="btn-outline" style="font-size:12px" onclick="fsShowAddVersion()">+ Add Version</button>
       </div>
-      <div id="fs-sub-form" style="display:none" class="fs-sub-inline-form">
-        <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:14px" id="fs-sub-form-label">New Subsection</div>
-        <input type="hidden" id="fs-sub-edit-idx" value="-1">
-        ${field('fs-sub-title','Title','')}
-        ${field('fs-sub-body','Body','',6)}
-        <div class="admin-field">
-          <label class="admin-label">Image</label>
-          <input class="admin-input" id="fs-sub-imageURL" type="text" placeholder="Paste image URL, or upload below" value="">
-          <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
-            <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="document.getElementById('fs-sub-img-file').click()">Upload image</button>
-            <input type="file" id="fs-sub-img-file" accept="image/*" style="display:none" onchange="fsUploadSubImage(this)">
-            <span id="fs-sub-img-progress" style="font-size:11px;color:var(--text-3)"></span>
-          </div>
+      <div id="fs-ver-form" style="display:none" class="fs-sub-inline-form">
+        <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:14px" id="fs-ver-form-label">New Version</div>
+        <input type="hidden" id="fs-ver-edit-idx" value="-1">
+        <div class="admin-2col">
+          <div class="admin-field"><label class="admin-label">Version Number</label>
+            <input class="admin-input" id="fs-ver-number" type="text" placeholder="v3" value=""></div>
+          <div class="admin-field"><label class="admin-label">Status</label>
+            <select class="admin-select" id="fs-ver-status">
+              <option value="In Progress">In Progress</option>
+              <option value="Pending">Pending</option>
+              <option value="Complete">Complete</option>
+            </select></div>
         </div>
+        <div class="admin-field"><label class="admin-label">Title</label>
+          <input class="admin-input" id="fs-ver-title" type="text" placeholder="Version 3 — Conceptual Baseline" value=""></div>
+        <div class="admin-field"><label class="admin-label">Objective</label>
+          <textarea class="admin-textarea" id="fs-ver-objective" rows="3"></textarea></div>
+        <div class="admin-field"><label class="admin-label">Design Canvas Version</label>
+          <input class="admin-input" id="fs-ver-dcv" type="text" style="width:160px" placeholder="v3" value=""></div>
+
+        <div class="admin-field">
+          <label class="admin-label">Parameters</label>
+          <div style="display:grid;grid-template-columns:1fr 1.3fr 1.3fr auto;gap:8px;margin-bottom:6px">
+            <div style="font-size:9.5px;color:var(--text-3);letter-spacing:0.08em;text-transform:uppercase">Parameter</div>
+            <div style="font-size:9.5px;color:var(--text-3);letter-spacing:0.08em;text-transform:uppercase">TRACE Value</div>
+            <div style="font-size:9.5px;color:var(--text-3);letter-spacing:0.08em;text-transform:uppercase">FORGE Target</div>
+            <div style="width:30px"></div>
+          </div>
+          <div id="fs-param-rows"></div>
+          <button class="btn-add-spec" onclick="fsAddParamRow()">+ Add Parameter Row</button>
+        </div>
+
+        <div class="admin-field"><label class="admin-label">Notes</label>
+          <textarea class="admin-textarea" id="fs-ver-notes" rows="3"></textarea></div>
         <div class="admin-save-row" style="gap:10px">
-          <button class="btn-ghost" style="font-size:12px" onclick="fsCancelSub()">Cancel</button>
-          <button class="btn-save" onclick="fsSaveSub()">Save Subsection</button>
+          <button class="btn-ghost" style="font-size:12px" onclick="fsCancelVersion()">Cancel</button>
+          <button class="btn-save" onclick="fsSaveVersion()">Save Version</button>
         </div>
       </div>
     </div>
@@ -2559,78 +2791,102 @@ window.fsSaveBlock = async function(docId, fields, elIds) {
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 };
 
-window.fsShowAddSub = function() {
-  document.getElementById('fs-sub-form').style.display = 'block';
-  document.getElementById('fs-sub-form-label').textContent = 'New Subsection';
-  document.getElementById('fs-sub-edit-idx').value = '-1';
-  document.getElementById('fs-sub-title').value = '';
-  document.getElementById('fs-sub-body').value = '';
-  document.getElementById('fs-sub-imageURL').value = '';
-  document.getElementById('fs-sub-img-progress').textContent = '';
+/* ── VERSIONS (accordion) ADMIN HELPERS ────────────── */
+function fsParamRowHTML(p) {
+  p = p || {};
+  return `<div class="fs-param-row-adm" style="display:grid;grid-template-columns:1fr 1.3fr 1.3fr auto;gap:8px;margin-bottom:8px">
+    <input class="admin-input fs-param-label-in" placeholder="Label" value="${esc(p.label||'')}">
+    <input class="admin-input fs-param-trace-in" placeholder="TRACE value" value="${esc(p.traceValue||'')}">
+    <input class="admin-input fs-param-forge-in" placeholder="FORGE target" value="${esc(p.forgeTarget||'')}">
+    <button class="btn-spec-rm" onclick="fsRemoveParamRow(this)" title="Remove">×</button>
+  </div>`;
+}
+
+window.fsAddParamRow = function(p) {
+  const wrap = document.getElementById('fs-param-rows');
+  if (!wrap) return;
+  const div = document.createElement('div');
+  div.innerHTML = fsParamRowHTML(p && p.label ? p : {});
+  wrap.appendChild(div.firstElementChild);
 };
 
-window.fsCancelSub = function() {
-  document.getElementById('fs-sub-form').style.display = 'none';
+window.fsRemoveParamRow = function(btn) {
+  const row = btn.closest('.fs-param-row-adm');
+  if (row) row.remove();
 };
 
-window.fsEditSub = function(i) {
-  const s = S.futureScope.subsections[i];
-  if (!s) return;
-  document.getElementById('fs-sub-form').style.display = 'block';
-  document.getElementById('fs-sub-form-label').textContent = 'Edit Subsection';
-  document.getElementById('fs-sub-edit-idx').value = String(i);
-  document.getElementById('fs-sub-title').value = s.title || '';
-  document.getElementById('fs-sub-body').value = s.body || '';
-  document.getElementById('fs-sub-imageURL').value = s.imageURL || '';
-  document.getElementById('fs-sub-img-progress').textContent = '';
-  document.getElementById('fs-sub-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function fsCollectParams() {
+  return Array.from(document.querySelectorAll('#fs-param-rows .fs-param-row-adm')).map(row => ({
+    label:       row.querySelector('.fs-param-label-in').value.trim(),
+    traceValue:  row.querySelector('.fs-param-trace-in').value.trim(),
+    forgeTarget: row.querySelector('.fs-param-forge-in').value.trim()
+  })).filter(p => p.label || p.traceValue || p.forgeTarget);
+}
+
+function fsFillVersionForm(v) {
+  v = v || {};
+  document.getElementById('fs-ver-number').value    = v.versionNumber || '';
+  document.getElementById('fs-ver-title').value     = v.title || '';
+  document.getElementById('fs-ver-objective').value = v.objective || '';
+  document.getElementById('fs-ver-status').value    = v.status || 'In Progress';
+  document.getElementById('fs-ver-dcv').value       = v.designCanvasVersion || '';
+  document.getElementById('fs-ver-notes').value     = v.notes || '';
+  const wrap = document.getElementById('fs-param-rows');
+  wrap.innerHTML = '';
+  (v.parameters || []).forEach(p => fsAddParamRow(p));
+}
+
+window.fsShowAddVersion = function() {
+  document.getElementById('fs-ver-form').style.display = 'block';
+  document.getElementById('fs-ver-form-label').textContent = 'New Version';
+  document.getElementById('fs-ver-edit-idx').value = '-1';
+  fsFillVersionForm({});
 };
 
-window.fsDeleteSub = async function(i) {
-  if (!confirm('Delete this subsection?')) return;
+window.fsCancelVersion = function() {
+  document.getElementById('fs-ver-form').style.display = 'none';
+};
+
+window.fsEditVersion = function(i) {
+  const v = S.futureScope.subsections[i];
+  if (!v) return;
+  document.getElementById('fs-ver-form').style.display = 'block';
+  document.getElementById('fs-ver-form-label').textContent = 'Edit Version';
+  document.getElementById('fs-ver-edit-idx').value = String(i);
+  fsFillVersionForm(v);
+  document.getElementById('fs-ver-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+window.fsDeleteVersion = async function(i) {
+  if (!confirm('Delete this version?')) return;
   const items = [...S.futureScope.subsections];
   items.splice(i, 1);
   try {
-    await db.collection('future_scope').doc('subsections').set({ items });
-    showToast('Subsection deleted.', 'success');
+    await db.collection('future_scope').doc('subsections').set({ items, seeded: true }, { merge: true });
+    showToast('Version deleted.', 'success');
   } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
 };
 
-window.fsSaveSub = async function() {
-  const idx = parseInt(document.getElementById('fs-sub-edit-idx').value);
-  const title    = document.getElementById('fs-sub-title').value.trim();
-  const body     = document.getElementById('fs-sub-body').value;
-  const imageURL = document.getElementById('fs-sub-imageURL').value.trim();
+window.fsSaveVersion = async function() {
+  const idx = parseInt(document.getElementById('fs-ver-edit-idx').value);
   const items = [...S.futureScope.subsections];
-  const entry = { id: idx >= 0 ? (items[idx].id || String(Date.now())) : String(Date.now()), title, body, imageURL, lastUpdated: new Date().toISOString() };
+  const entry = {
+    id:                  idx >= 0 ? (items[idx].id || String(Date.now())) : String(Date.now()),
+    versionNumber:       document.getElementById('fs-ver-number').value.trim(),
+    title:               document.getElementById('fs-ver-title').value.trim(),
+    objective:           document.getElementById('fs-ver-objective').value,
+    status:              document.getElementById('fs-ver-status').value,
+    designCanvasVersion: document.getElementById('fs-ver-dcv').value.trim(),
+    parameters:          fsCollectParams(),
+    notes:               document.getElementById('fs-ver-notes').value,
+    lastUpdated:         new Date().toISOString()
+  };
   if (idx >= 0) { items[idx] = entry; } else { items.push(entry); }
   try {
-    await db.collection('future_scope').doc('subsections').set({ items });
-    document.getElementById('fs-sub-form').style.display = 'none';
-    showToast('Subsection saved.', 'success');
+    await db.collection('future_scope').doc('subsections').set({ items, seeded: true }, { merge: true });
+    document.getElementById('fs-ver-form').style.display = 'none';
+    showToast('Version saved.', 'success');
   } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
-};
-
-window.fsUploadSubImage = function(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const id = document.getElementById('fs-sub-edit-idx').value;
-  const entryId = id >= 0 ? (S.futureScope.subsections[parseInt(id)]?.id || String(Date.now())) : String(Date.now());
-  const path = 'future-scope/subsections/' + entryId + '/' + file.name.replace(/[^\w.\-]+/g, '_');
-  const prog = document.getElementById('fs-sub-img-progress');
-  prog.textContent = '0%';
-  const task = storage.ref(path).put(file, { contentType: file.type || undefined });
-  task.on('state_changed',
-    snap => { prog.textContent = snap.totalBytes ? Math.round(snap.bytesTransferred / snap.totalBytes * 100) + '%' : '…'; },
-    err => { prog.textContent = 'Upload failed'; showToast('Upload failed: ' + err.message, 'error'); },
-    async () => {
-      try {
-        const url = await task.snapshot.ref.getDownloadURL();
-        document.getElementById('fs-sub-imageURL').value = url;
-        prog.textContent = 'Uploaded ✓';
-        showToast('Image uploaded — click Save Subsection to keep it.', 'success');
-      } catch (e) { prog.textContent = 'URL error'; }
-    });
 };
 
 /* ── ADMIN — DESIGN CANVAS ─────────────────────────── */
