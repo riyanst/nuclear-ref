@@ -470,6 +470,72 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .fs-check-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; }
 .fs-check-lbl input { accent-color: var(--accent); width: 15px; height: 15px; }
 
+/* Deep link — FORGE → TRACE */
+.fs-comp-tracelink {
+  display: inline-block; margin-top: 10px;
+  font-size: 12.5px; color: var(--accent-lt); cursor: pointer;
+  text-decoration: none; transition: var(--ease);
+}
+.fs-comp-tracelink:hover { text-decoration: underline; color: var(--accent); }
+
+@keyframes sentenceGlow {
+  0%   { background-color: rgba(245, 158, 11, 0.55); box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+  70%  { background-color: rgba(245, 158, 11, 0.3); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+.sentence-highlight {
+  animation: sentenceGlow 3.5s ease-out forwards;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+
+@keyframes drawLine {
+  from { width: 0; }
+  to   { width: 60%; }
+}
+#transition-line {
+  height: 1px;
+  background: rgb(245, 158, 11);
+  animation: drawLine 600ms ease-out forwards;
+  margin: 16px auto;
+}
+
+/* Territory transition overlay */
+#territory-transition-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(5, 8, 20, 0.97);
+  opacity: 0; transition: opacity 200ms ease;
+}
+#territory-transition-overlay.tt-visible { display: flex; }
+#territory-transition-overlay.tt-shown { opacity: 1; }
+.tt-inner { text-align: center; max-width: 90vw; padding: 0 24px; }
+.tt-top-label, .tt-dest-label {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);
+  opacity: 0; transition: opacity 200ms ease;
+}
+.tt-center-text {
+  font-size: 19px; font-weight: 500; color: #EDEAE2; letter-spacing: -0.01em;
+  opacity: 0; transition: opacity 200ms ease;
+}
+.tt-dest-wrap { margin-top: 22px; opacity: 0; transition: opacity 200ms ease; }
+.tt-dest-reactor {
+  font-size: 22px; font-weight: 500; color: var(--accent-lt);
+  letter-spacing: -0.01em; margin-top: 6px;
+}
+.tt-fade-in { opacity: 1 !important; }
+
+/* Reactor section → FORGE backlink callout */
+.forge-backlink {
+  margin-top: 18px; padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: rgba(245, 158, 11, 0.06); border-radius: 0 6px 6px 0;
+  font-size: 12.5px; color: var(--accent-lt); cursor: pointer;
+  transition: var(--ease);
+}
+.forge-backlink:hover { background: rgba(245, 158, 11, 0.11); }
+
 /* Admin sub-card within admin-content */
 .fs-adm-card {
   background: var(--bg-2); border: 1px solid var(--border);
@@ -1661,6 +1727,19 @@ mark.cm-highlight {
     </div>
   </div>
 
+  <!-- TERRITORY TRANSITION OVERLAY (FORGE → TRACE deep link) -->
+  <div id="territory-transition-overlay">
+    <div class="tt-inner">
+      <div class="tt-top-label" id="tt-top-label">Leaving FORGE Territory</div>
+      <div id="transition-line-wrap"><div id="transition-line"></div></div>
+      <div class="tt-center-text" id="tt-center-text">Tracing knowledge to TRACE…</div>
+      <div class="tt-dest-wrap" id="tt-dest-wrap">
+        <div class="tt-dest-label" id="tt-dest-label">NERVA — OPERATING CONDITIONS</div>
+        <div class="tt-dest-reactor" id="tt-dest-reactor">NERVA</div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Firebase SDKs -->
@@ -2004,6 +2083,16 @@ function renderFuture() {
           html += '</div>';
         }
         if (c.knowledgeSource) html += '<div class="fs-comp-source"><span class="fs-comp-source-lbl">Knowledge source:</span> ' + esc(c.knowledgeSource) + '</div>';
+        if (c.knowledgeLinkReactor) {
+          const sec = traceSectionBySlug(c.knowledgeLinkSection);
+          const rn = reactorNameById(c.knowledgeLinkReactor);
+          const secLabel = sec ? sec.label : (c.knowledgeLinkSection || '');
+          html += '<a class="fs-comp-tracelink" onclick="triggerTerritoryTransition('
+            + "'" + esc(c.knowledgeLinkReactor).replace(/'/g, "\\'") + "','"
+            + esc(c.knowledgeLinkSection || '').replace(/'/g, "\\'") + "',"
+            + JSON.stringify(c.knowledgeLinkSentence || '').replace(/"/g, '&quot;')
+            + ')">→ View in TRACE: ' + esc(rn) + ' — ' + esc(secLabel) + '</a>';
+        }
         if (c.notes) html += '<div class="fs-comp-notes">' + esc(c.notes) + '</div>';
         html += '</div>';
       });
@@ -2078,6 +2167,12 @@ function renderProfile(r) {
   /* reference-panel footer per section — only when the section has content */
   const rf = (key) => (window.RP && r[key] && String(r[key]).trim())
     ? RP.sectionFooterHTML(r.id, key, r[key + 'Refs'], r[key + 'Date']) : '';
+  /* FORGE backlink callout per section — when forgeReference is set */
+  const fb = (key) => {
+    const ref = r[key + 'ForgeRef'];
+    return (ref && String(ref).trim())
+      ? `<div class="forge-backlink" onclick="show('future')">↗ Referenced in FORGE: ${esc(ref)}</div>` : '';
+  };
   const pillClass = 'pill-' + (r.statusType || 'historical');
   const specsHtml = r.specs && r.specs.length
     ? `<div class="spec-table">${r.specs.map(s => `<div class="spec-cell"><div class="spec-key">${esc(s.key)}</div><div class="spec-val">${esc(s.value)}</div></div>`).join('')}</div>`
@@ -2096,10 +2191,10 @@ function renderProfile(r) {
       <div class="profile-fullname">${esc(r.fullName)}</div>
     </div>
     ${specsHtml}
-    <div class="profile-block"><div class="block-label">Design overview</div>${rt(r.designOverview)}${rf('designOverview')}</div>
-    <div class="profile-block"><div class="block-label">Key materials</div>${rt(r.keyMaterials)}${rf('keyMaterials')}</div>
-    <div class="profile-block"><div class="block-label">Operating conditions</div>${rt(r.operatingConditions)}${rf('operatingConditions')}</div>
-    <div class="profile-block"><div class="block-label">Current status</div>${rt(r.currentStatus)}${rf('currentStatus')}</div>`;
+    <div class="profile-block" data-section="design-overview"><div class="block-label">Design overview</div>${rt(r.designOverview)}${rf('designOverview')}${fb('designOverview')}</div>
+    <div class="profile-block" data-section="key-materials"><div class="block-label">Key materials</div>${rt(r.keyMaterials)}${rf('keyMaterials')}${fb('keyMaterials')}</div>
+    <div class="profile-block" data-section="operating-conditions"><div class="block-label">Operating conditions</div>${rt(r.operatingConditions)}${rf('operatingConditions')}${fb('operatingConditions')}</div>
+    <div class="profile-block" data-section="current-status"><div class="block-label">Current status</div>${rt(r.currentStatus)}${rf('currentStatus')}${fb('currentStatus')}</div>`;
 }
 
 function renderSidebarNav() {
@@ -2153,6 +2248,128 @@ function navToReactorByName(name) {
   else { showToast('No profile found for "' + name + '".', 'error'); }
 }
 window.navToReactorByName = navToReactorByName;
+
+/* ── FORGE → TRACE TERRITORY TRANSITION ────────────────
+   Elegant full-screen transition, then navigate to the
+   target reactor + section and highlight the sentence. */
+let __ttActive = false;
+function triggerTerritoryTransition(reactorId, sectionSlug, sentence) {
+  const ov = document.getElementById('territory-transition-overlay');
+  if (!ov) { doTraceNavigate(reactorId, sectionSlug, sentence); return; }
+  if (__ttActive) return;   // ignore rapid re-clicks while a transition runs
+  __ttActive = true;
+
+  const sec = traceSectionBySlug(sectionSlug);
+  const rn = reactorNameById(reactorId);
+  const secLabel = sec ? sec.label : (sectionSlug || '');
+
+  /* populate destination labels */
+  const destLabel = document.getElementById('tt-dest-label');
+  const destReactor = document.getElementById('tt-dest-reactor');
+  if (destLabel) destLabel.textContent = (rn + ' — ' + secLabel).toUpperCase();
+  if (destReactor) destReactor.textContent = rn;
+
+  const topLabel = document.getElementById('tt-top-label');
+  const centerText = document.getElementById('tt-center-text');
+  const destWrap = document.getElementById('tt-dest-wrap');
+  const lineWrap = document.getElementById('transition-line-wrap');
+
+  /* reset fade states + re-arm the line-draw animation */
+  [topLabel, centerText, destWrap].forEach(el => el && el.classList.remove('tt-fade-in'));
+  if (lineWrap) lineWrap.innerHTML = '<div id="transition-line" style="animation:none;width:0"></div>';
+
+  /* 1. overlay fades in (200ms) */
+  ov.classList.add('tt-visible');
+  requestAnimationFrame(() => {
+    // force reflow so the display:flex→opacity transition runs
+    void ov.offsetWidth;
+    ov.classList.add('tt-shown');
+  });
+
+  /* 2. top label (150ms) */
+  setTimeout(() => { if (topLabel) topLabel.classList.add('tt-fade-in'); }, 150);
+
+  /* 3. line draws across (600ms CSS anim, 300ms delay) */
+  setTimeout(() => {
+    const ln = document.getElementById('transition-line');
+    if (ln) { ln.style.animation = ''; ln.style.width = '0'; void ln.offsetWidth; ln.style.animation = 'drawLine 600ms ease-out forwards'; }
+  }, 300);
+
+  /* 4. centre text (200ms fade, 500ms delay) */
+  setTimeout(() => { if (centerText) centerText.classList.add('tt-fade-in'); }, 500);
+
+  /* 5. destination label (200ms fade, 700ms delay) */
+  setTimeout(() => { if (destWrap) destWrap.classList.add('tt-fade-in'); }, 700);
+
+  /* 6. hold until ~900ms of content shown + 400ms hold, then 7. fade out (400ms) */
+  setTimeout(() => {
+    ov.classList.remove('tt-shown');   // fade out (400ms via CSS)
+    /* 8. on fade-out complete: navigate + highlight */
+    setTimeout(() => {
+      ov.classList.remove('tt-visible');
+      __ttActive = false;
+      doTraceNavigate(reactorId, sectionSlug, sentence);
+    }, 400);
+  }, 1300);
+}
+window.triggerTerritoryTransition = triggerTerritoryTransition;
+
+/* navigate to reactor, then find + highlight the sentence */
+function doTraceNavigate(reactorId, sectionSlug, sentence) {
+  const r = (S.reactors || []).find(x => x.id === reactorId);
+  if (r) { navToReactor(r.id); }
+  else { navToReactorByName(reactorId); }
+
+  if (!sentence || !String(sentence).trim()) return;
+  /* wait 300ms for the profile to render */
+  setTimeout(() => { highlightSentence(sentence); }, 300);
+}
+
+/* Search rendered paragraph/span text nodes for an exact-match sentence,
+   wrap it, scroll into view, and fade the highlight after 3.5s. */
+function highlightSentence(sentence) {
+  const target = String(sentence).trim();
+  if (!target) return;
+  const root = document.getElementById('profile-content');
+  if (!root) return;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || node.nodeValue.indexOf(target) === -1) return NodeFilter.FILTER_REJECT;
+      /* skip nodes already inside a highlight */
+      if (node.parentElement && node.parentElement.closest('.sentence-highlight')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const node = walker.nextNode();
+  if (!node) return;   /* not found — navigate only, no error */
+
+  const text = node.nodeValue;
+  const idx = text.indexOf(target);
+  const before = text.slice(0, idx);
+  const after = text.slice(idx + target.length);
+
+  const span = document.createElement('span');
+  span.className = 'sentence-highlight';
+  span.textContent = target;
+
+  const frag = document.createDocumentFragment();
+  if (before) frag.appendChild(document.createTextNode(before));
+  frag.appendChild(span);
+  if (after) frag.appendChild(document.createTextNode(after));
+  node.parentNode.replaceChild(frag, node);
+
+  span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  /* remove wrapper after the glow finishes (3.5s) so the DOM returns to plain text */
+  setTimeout(() => {
+    if (span.parentNode) {
+      span.parentNode.replaceChild(document.createTextNode(span.textContent), span);
+    }
+  }, 3600);
+}
+window.highlightSentence = highlightSentence;
 
 /* ── ADMIN AUTH ────────────────────────────────────── */
 const ADMIN_KEY = atob('TnVjbGVhclJlZjIwMjY='); // NuclearRef2026
@@ -2419,6 +2636,19 @@ window.fsUploadSubImage = function(input) {
 /* ── ADMIN — DESIGN CANVAS ─────────────────────────── */
 const FS_REACTOR_OPTIONS = ['NERVA', 'DRACO', 'Kilopower', 'Rolls-Royce SMR', 'SR-1 Freedom'];
 
+/* TRACE section slug ↔ reactor field key ↔ display label */
+const TRACE_SECTIONS = [
+  { slug: 'design-overview',      key: 'designOverview',      label: 'Design Overview' },
+  { slug: 'key-materials',        key: 'keyMaterials',        label: 'Key Materials' },
+  { slug: 'operating-conditions', key: 'operatingConditions', label: 'Operating Conditions' },
+  { slug: 'current-status',       key: 'currentStatus',       label: 'Current Status' }
+];
+function traceSectionBySlug(slug) { return TRACE_SECTIONS.find(s => s.slug === slug) || null; }
+function reactorNameById(id) {
+  const r = (S.reactors || []).find(x => x.id === id);
+  return r ? r.name : id;
+}
+
 function renderAdminDesignCanvas() {
   const dc = S.futureScope.designCanvas || {};
   const comps = dc.components || [];
@@ -2484,6 +2714,31 @@ function renderAdminDesignCanvas() {
           </div>
           <div class="admin-field"><label class="admin-label">Knowledge source</label>
             <input class="admin-input" id="fs-comp-source" type="text" placeholder="e.g. NERVA Design Overview · External: ITER tokamak database" value=""></div>
+
+          <div class="admin-field" style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+            <label class="admin-label" style="color:var(--accent)">Deep Link to TRACE (optional)</label>
+            <div class="admin-2col" style="margin-top:8px">
+              <div>
+                <label class="admin-label">Reactor</label>
+                <select class="admin-select" id="fs-comp-link-reactor" onchange="fsToggleLinkSection()">
+                  <option value="">None</option>
+                  ${(S.reactors && S.reactors.length ? S.reactors : FS_REACTOR_OPTIONS.map(n => ({ id: n.toLowerCase().replace(/[^a-z0-9]+/g,'-'), name: n })))
+                    .map(rr => `<option value="${esc(rr.id)}">${esc(rr.name)}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="admin-label">Section</label>
+                <select class="admin-select" id="fs-comp-link-section" disabled>
+                  <option value="design-overview">Design Overview</option>
+                  <option value="key-materials">Key Materials</option>
+                  <option value="operating-conditions">Operating Conditions</option>
+                  <option value="current-status">Current Status</option>
+                </select>
+              </div>
+            </div>
+            <textarea class="admin-textarea" id="fs-comp-link-sentence" rows="2" style="margin-top:10px" placeholder="Paste the exact sentence from that section to highlight on arrival"></textarea>
+          </div>
+
           <div class="admin-field"><label class="admin-label">Notes</label>
             <textarea class="admin-textarea" id="fs-comp-notes" rows="3"></textarea></div>
           <div class="admin-save-row" style="gap:10px">
@@ -2537,7 +2792,22 @@ function fsFillCompForm(c) {
   document.querySelectorAll('.fs-comp-reactor').forEach(cb => {
     cb.checked = links.includes(cb.value.toLowerCase());
   });
+  /* deep link fields */
+  const lr = document.getElementById('fs-comp-link-reactor');
+  const ls = document.getElementById('fs-comp-link-section');
+  const lt = document.getElementById('fs-comp-link-sentence');
+  if (lr) lr.value = c.knowledgeLinkReactor || '';
+  if (ls) ls.value = c.knowledgeLinkSection || 'design-overview';
+  if (lt) lt.value = c.knowledgeLinkSentence || '';
+  fsToggleLinkSection();
 }
+
+window.fsToggleLinkSection = function() {
+  const lr = document.getElementById('fs-comp-link-reactor');
+  const ls = document.getElementById('fs-comp-link-section');
+  if (!lr || !ls) return;
+  ls.disabled = !lr.value;
+};
 
 window.fsShowAddComp = function() {
   document.getElementById('fs-comp-form').style.display = 'block';
@@ -2575,13 +2845,17 @@ window.fsSaveComp = async function() {
   const linkedReactors = Array.from(document.querySelectorAll('.fs-comp-reactor'))
     .filter(cb => cb.checked).map(cb => cb.value);
   const components = [...(S.futureScope.designCanvas.components || [])];
+  const linkReactor = document.getElementById('fs-comp-link-reactor').value;
   const entry = {
     id: idx >= 0 ? (components[idx].id || String(Date.now())) : String(Date.now()),
     name:           document.getElementById('fs-comp-name').value.trim(),
     description:    document.getElementById('fs-comp-desc').value,
     linkedReactors: linkedReactors,
     knowledgeSource:document.getElementById('fs-comp-source').value.trim(),
-    notes:          document.getElementById('fs-comp-notes').value
+    notes:          document.getElementById('fs-comp-notes').value,
+    knowledgeLinkReactor:  linkReactor,
+    knowledgeLinkSection:  linkReactor ? document.getElementById('fs-comp-link-section').value : '',
+    knowledgeLinkSentence: linkReactor ? document.getElementById('fs-comp-link-sentence').value.trim() : ''
   };
   if (idx >= 0) { components[idx] = entry; } else { components.push(entry); }
   try {
@@ -2767,8 +3041,11 @@ function reactorFormHTML(r) {
         <div><label class="admin-label">Last reviewed date</label><input class="admin-input" id="rf-${key}Date" value="${v(key + 'Date')}" placeholder="03 July 2026"></div>
         <div><label class="admin-label">References</label>${RP.refsPickerHTML('rf-' + key + 'Refs', isNew ? [] : (r[key + 'Refs'] || []))}</div>
       </div>` : '';
+    const forgeRef = `
+      <div style="margin-top:10px"><label class="admin-label">FORGE Reference (optional)</label>
+        <input class="admin-input" id="rf-${key}ForgeRef" value="${v(key + 'ForgeRef')}" placeholder="e.g. Plasma Torus — FORGE Concept v3"></div>`;
     return `
-      <div class="admin-field"><label class="admin-label">${label}</label><textarea class="admin-textarea" id="rf-${key}" rows="6">${v(key)}</textarea>${refMeta}</div>`;
+      <div class="admin-field"><label class="admin-label">${label}</label><textarea class="admin-textarea" id="rf-${key}" rows="6">${v(key)}</textarea>${refMeta}${forgeRef}</div>`;
   }
 }
 
@@ -2850,6 +3127,10 @@ window.saveReactor = async function(id) {
     if (window.RP && document.getElementById('rf-' + k + 'Refs')) {
       data[k + 'Refs'] = RP.collectPicker('rf-' + k + 'Refs');
       data[k + 'Date'] = getVal('rf-' + k + 'Date');
+    }
+    /* per-section FORGE backlink reference */
+    if (document.getElementById('rf-' + k + 'ForgeRef')) {
+      data[k + 'ForgeRef'] = getVal('rf-' + k + 'ForgeRef');
     }
   });
 
