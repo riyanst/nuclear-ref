@@ -422,6 +422,54 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .fs-subsection-title { font-size: 18px; font-weight: 500; color: var(--text-1); margin-bottom: 12px; }
 .fs-subsection-body { font-size: 14px; color: var(--text-2); line-height: 1.8; white-space: pre-wrap; }
 
+/* Design Canvas */
+.fs-canvas { margin: 40px 0; }
+.fs-canvas-tag {
+  font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 16px;
+}
+.fs-canvas-img-wrap { position: relative; }
+.fs-canvas-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.fs-canvas-ver {
+  position: absolute; top: 12px; right: 12px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.05em; color: var(--accent-lt);
+  background: rgba(6,6,14,0.82); border: 1px solid var(--accent-border);
+  padding: 5px 10px; border-radius: 6px; backdrop-filter: blur(4px);
+}
+.fs-canvas-caption { font-size: 12px; color: var(--text-3); margin-top: 10px; text-align: center; }
+.fs-canvas-placeholder {
+  background: var(--bg-2); border: 1px dashed var(--border-md); border-radius: 10px;
+  padding: 48px 32px; text-align: center; font-size: 13px; color: var(--text-3);
+  font-family: 'IBM Plex Mono', monospace;
+}
+.fs-canvas-heading {
+  font-size: 20px; font-weight: 500; letter-spacing: -0.02em;
+  color: var(--text-1); margin: 40px 0 20px;
+}
+.fs-comp-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 22px 24px; margin-bottom: 14px;
+}
+.fs-comp-name { font-size: 16px; font-weight: 500; color: var(--text-1); margin-bottom: 8px; }
+.fs-comp-desc { font-size: 14px; color: var(--text-2); line-height: 1.75; white-space: pre-wrap; margin-bottom: 14px; }
+.fs-comp-connected { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.fs-comp-connected-lbl { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.fs-comp-badge {
+  font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 500;
+  color: var(--accent-lt); background: var(--accent-muted);
+  border: 1px solid var(--accent-border); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer; transition: var(--ease);
+}
+.fs-comp-badge:hover { background: var(--accent-border); color: var(--text-1); }
+.fs-comp-source { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+.fs-comp-source-lbl { color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
+.fs-comp-notes { font-size: 13px; color: var(--text-3); font-style: italic; line-height: 1.7; white-space: pre-wrap; }
+.fs-canvas-img-preview { max-width: 260px; border-radius: 8px; border: 1px solid var(--border); margin-top: 10px; display: block; }
+.fs-check-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+.fs-check-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.fs-check-lbl input { accent-color: var(--accent); width: 15px; height: 15px; }
+
 /* Admin sub-card within admin-content */
 .fs-adm-card {
   background: var(--bg-2); border: 1px solid var(--border);
@@ -1637,7 +1685,7 @@ const storage = firebase.storage();
 /* ── STATE ─────────────────────────────────────────── */
 const S = {
   home: {}, future: {}, about: {},
-  futureScope: { conceptOverview: {}, trace: {}, forge: {}, convergence: {}, subsections: [] },
+  futureScope: { conceptOverview: {}, trace: {}, forge: {}, convergence: {}, subsections: [], designCanvas: { components: [] } },
   reactors: [], glossary: [],
   currentSection: 'home',
   selectedReactor: null,
@@ -1795,6 +1843,20 @@ async function seedIfNeeded() {
       await fsBatch.commit();
     }
   } catch (e) { console.warn('Future scope seed error:', e); }
+
+  /* Seed design-canvas doc independently */
+  try {
+    const dcSnap = await db.collection('future_scope').doc('design-canvas').get();
+    if (!dcSnap.exists) {
+      await db.collection('future_scope').doc('design-canvas').set({
+        imageURL: '',
+        imageCaption: '',
+        version: 'v3',
+        components: [],
+        lastUpdated: new Date().toISOString()
+      });
+    }
+  } catch (e) { console.warn('Design canvas seed error:', e); }
 }
 
 /* ── LOAD ──────────────────────────────────────────── */
@@ -1821,6 +1883,13 @@ function loadAll() {
   db.collection('future_scope').doc('subsections').onSnapshot(snap => {
     const d = snap.data() || {};
     S.futureScope.subsections = d.items || [];
+    renderFuture();
+    if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
+  });
+  db.collection('future_scope').doc('design-canvas').onSnapshot(snap => {
+    const d = snap.data() || {};
+    d.components = d.components || [];
+    S.futureScope.designCanvas = d;
     renderFuture();
     if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
   });
@@ -1900,6 +1969,45 @@ function renderFuture() {
     if (fo.title)    html += '<div class="fs-track-title">' + esc(fo.title) + '</div>';
     if (fo.subtitle) html += '<div class="fs-track-subtitle">' + esc(fo.subtitle) + '</div>';
     if (fo.body)     html += '<div class="fs-track-body">' + esc(fo.body) + '</div>';
+    html += '</div>';
+  }
+
+  /* 3.5 Design Canvas — between FORGE and Convergence */
+  const dc = fs.designCanvas || {};
+  const dcVer = dc.version ? esc(dc.version) : 'v3';
+  {
+    html += '<div class="fs-canvas">';
+    html += '<div class="fs-canvas-tag">Design Canvas</div>';
+    if (dc.imageURL) {
+      html += '<div class="fs-canvas-img-wrap">';
+      html += '<div class="fs-canvas-ver">FORGE Concept ' + dcVer + '</div>';
+      html += '<img class="fs-canvas-img" src="' + esc(dc.imageURL) + '" alt="' + esc(dc.imageCaption || 'FORGE design canvas') + '">';
+      html += '</div>';
+      if (dc.imageCaption) html += '<div class="fs-canvas-caption">' + esc(dc.imageCaption) + '</div>';
+    } else {
+      html += '<div class="fs-canvas-placeholder">Design render pending — FORGE Concept ' + dcVer + ' in development</div>';
+    }
+
+    const comps = dc.components || [];
+    if (comps.length) {
+      html += '<h2 class="fs-canvas-heading">Component Analysis</h2>';
+      comps.forEach(c => {
+        html += '<div class="fs-comp-card">';
+        if (c.name) html += '<div class="fs-comp-name">' + esc(c.name) + '</div>';
+        if (c.description) html += '<div class="fs-comp-desc">' + esc(c.description) + '</div>';
+        const links = c.linkedReactors || [];
+        if (links.length) {
+          html += '<div class="fs-comp-connected"><span class="fs-comp-connected-lbl">Connected to:</span>';
+          links.forEach(rn => {
+            html += '<button class="fs-comp-badge" onclick="navToReactorByName(\'' + esc(rn).replace(/'/g, "\\'") + '\')">' + esc(rn) + '</button>';
+          });
+          html += '</div>';
+        }
+        if (c.knowledgeSource) html += '<div class="fs-comp-source"><span class="fs-comp-source-lbl">Knowledge source:</span> ' + esc(c.knowledgeSource) + '</div>';
+        if (c.notes) html += '<div class="fs-comp-notes">' + esc(c.notes) + '</div>';
+        html += '</div>';
+      });
+    }
     html += '</div>';
   }
 
@@ -2005,6 +2113,7 @@ function setHTML(id, html) { const el = document.getElementById(id); if (el) el.
 
 /* ── NAVIGATION ────────────────────────────────────── */
 function show(sectionId) {
+  if (window.GV) GV.reset();   // never let the Graph View overlay block navigation
   if (window.DD) DD.closeAll();
   if (window.RP) RP.close();
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -2031,6 +2140,19 @@ function navToReactor(id) {
   const btn = document.querySelector('[data-reactor="' + id + '"]');
   if (btn) btn.classList.add('active');
 }
+
+/* Navigate to a reactor by its display name (case-insensitive) — used by
+   Design Canvas component badges, which store reactor names not ids. */
+function navToReactorByName(name) {
+  if (!name) return;
+  const target = String(name).trim().toLowerCase();
+  const r = S.reactors.find(x =>
+    (x.name || '').trim().toLowerCase() === target ||
+    (x.fullName || '').trim().toLowerCase() === target);
+  if (r) { navToReactor(r.id); }
+  else { showToast('No profile found for "' + name + '".', 'error'); }
+}
+window.navToReactorByName = navToReactorByName;
 
 /* ── ADMIN AUTH ────────────────────────────────────── */
 const ADMIN_KEY = atob('TnVjbGVhclJlZjIwMjY='); // NuclearRef2026
@@ -2169,6 +2291,9 @@ function renderAdminFuture() {
       <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('forge',['title','subtitle','body'],['fs-fo-title','fs-fo-subtitle','fs-fo-body'])">Save</button></div>
     </div>
 
+    <!-- Card: Design Canvas (between FORGE and Convergence) -->
+    ${renderAdminDesignCanvas()}
+
     <!-- Card 4: Convergence -->
     <div class="fs-adm-card">
       <div class="fs-adm-card-title">Convergence</div>
@@ -2289,6 +2414,181 @@ window.fsUploadSubImage = function(input) {
         showToast('Image uploaded — click Save Subsection to keep it.', 'success');
       } catch (e) { prog.textContent = 'URL error'; }
     });
+};
+
+/* ── ADMIN — DESIGN CANVAS ─────────────────────────── */
+const FS_REACTOR_OPTIONS = ['NERVA', 'DRACO', 'Kilopower', 'Rolls-Royce SMR', 'SR-1 Freedom'];
+
+function renderAdminDesignCanvas() {
+  const dc = S.futureScope.designCanvas || {};
+  const comps = dc.components || [];
+
+  const compItems = comps.map((c, i) => `
+    <div class="fs-sub-item">
+      <div class="fs-sub-item-info">
+        <div class="fs-sub-item-title">${esc(c.name || '(unnamed)')}</div>
+        <div class="fs-sub-item-body">${esc((c.linkedReactors || []).join(', ') || 'no linked reactors')}</div>
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="fsEditComp(${i})">Edit</button>
+        <button class="btn-danger" style="font-size:11px;padding:5px 10px" onclick="fsDeleteComp(${i})">Delete</button>
+      </div>
+    </div>`).join('');
+
+  const preview = dc.imageURL
+    ? `<img class="fs-canvas-img-preview" src="${esc(dc.imageURL)}" alt="current design canvas">`
+    : '<div style="font-size:12px;color:var(--text-3);margin-top:8px">No image uploaded yet.</div>';
+
+  return `
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">Design Canvas</div>
+
+      <div class="admin-field"><label class="admin-label">Version</label>
+        <input class="admin-input" id="fs-dc-version" type="text" style="width:160px" placeholder="v3" value="${esc(dc.version || '')}"></div>
+
+      <div class="admin-field">
+        <label class="admin-label">Image</label>
+        <input class="admin-input" id="fs-dc-imageURL" type="text" placeholder="Paste image URL, or upload below" value="${esc(dc.imageURL || '')}">
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+          <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="document.getElementById('fs-dc-img-file').click()">Upload image</button>
+          <input type="file" id="fs-dc-img-file" accept="image/*" style="display:none" onchange="fsUploadCanvasImage(this)">
+          <span id="fs-dc-img-progress" style="font-size:11px;color:var(--text-3)"></span>
+        </div>
+        ${preview}
+      </div>
+
+      <div class="admin-field"><label class="admin-label">Image caption</label>
+        <input class="admin-input" id="fs-dc-caption" type="text" placeholder="Caption shown below the image" value="${esc(dc.imageCaption || '')}"></div>
+
+      <div class="admin-save-row"><button class="btn-save" onclick="fsSaveCanvasMeta()">Save canvas</button></div>
+
+      <div style="margin-top:24px;padding-top:22px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-2);margin-bottom:14px">Components</div>
+        <div id="fs-comp-list">${compItems || '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No components yet.</div>'}</div>
+        <div style="margin-top:14px">
+          <button class="btn-outline" style="font-size:12px" onclick="fsShowAddComp()">+ Add Component</button>
+        </div>
+
+        <div id="fs-comp-form" style="display:none" class="fs-sub-inline-form">
+          <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:14px" id="fs-comp-form-label">New Component</div>
+          <input type="hidden" id="fs-comp-edit-idx" value="-1">
+          <div class="admin-field"><label class="admin-label">Name</label>
+            <input class="admin-input" id="fs-comp-name" type="text" value=""></div>
+          <div class="admin-field"><label class="admin-label">Description</label>
+            <textarea class="admin-textarea" id="fs-comp-desc" rows="4"></textarea></div>
+          <div class="admin-field"><label class="admin-label">Linked reactors</label>
+            <div class="fs-check-row">
+              ${FS_REACTOR_OPTIONS.map((rn, k) => `
+                <label class="fs-check-lbl"><input type="checkbox" class="fs-comp-reactor" value="${esc(rn)}" id="fs-comp-r-${k}">${esc(rn)}</label>`).join('')}
+            </div>
+          </div>
+          <div class="admin-field"><label class="admin-label">Knowledge source</label>
+            <input class="admin-input" id="fs-comp-source" type="text" placeholder="e.g. NERVA Design Overview · External: ITER tokamak database" value=""></div>
+          <div class="admin-field"><label class="admin-label">Notes</label>
+            <textarea class="admin-textarea" id="fs-comp-notes" rows="3"></textarea></div>
+          <div class="admin-save-row" style="gap:10px">
+            <button class="btn-ghost" style="font-size:12px" onclick="fsCancelComp()">Cancel</button>
+            <button class="btn-save" onclick="fsSaveComp()">Save Component</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.fsSaveCanvasMeta = async function() {
+  const data = {
+    version:      document.getElementById('fs-dc-version').value.trim(),
+    imageURL:     document.getElementById('fs-dc-imageURL').value.trim(),
+    imageCaption: document.getElementById('fs-dc-caption').value.trim(),
+    lastUpdated:  new Date().toISOString()
+  };
+  try {
+    await db.collection('future_scope').doc('design-canvas').set(data, { merge: true });
+    showToast('Canvas saved.', 'success');
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+};
+
+window.fsUploadCanvasImage = function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const path = 'future-scope/design-canvas/' + file.name.replace(/[^\w.\-]+/g, '_');
+  const prog = document.getElementById('fs-dc-img-progress');
+  prog.textContent = '0%';
+  const task = storage.ref(path).put(file, { contentType: file.type || undefined });
+  task.on('state_changed',
+    snap => { prog.textContent = snap.totalBytes ? Math.round(snap.bytesTransferred / snap.totalBytes * 100) + '%' : '…'; },
+    err => { prog.textContent = 'Upload failed'; showToast('Upload failed: ' + err.message, 'error'); },
+    async () => {
+      try {
+        const url = await task.snapshot.ref.getDownloadURL();
+        document.getElementById('fs-dc-imageURL').value = url;
+        prog.textContent = 'Uploaded ✓';
+        showToast('Image uploaded — click Save canvas to keep it.', 'success');
+      } catch (e) { prog.textContent = 'URL error'; }
+    });
+};
+
+function fsFillCompForm(c) {
+  document.getElementById('fs-comp-name').value = c.name || '';
+  document.getElementById('fs-comp-desc').value = c.description || '';
+  document.getElementById('fs-comp-source').value = c.knowledgeSource || '';
+  document.getElementById('fs-comp-notes').value = c.notes || '';
+  const links = (c.linkedReactors || []).map(x => x.toLowerCase());
+  document.querySelectorAll('.fs-comp-reactor').forEach(cb => {
+    cb.checked = links.includes(cb.value.toLowerCase());
+  });
+}
+
+window.fsShowAddComp = function() {
+  document.getElementById('fs-comp-form').style.display = 'block';
+  document.getElementById('fs-comp-form-label').textContent = 'New Component';
+  document.getElementById('fs-comp-edit-idx').value = '-1';
+  fsFillCompForm({});
+};
+
+window.fsCancelComp = function() {
+  document.getElementById('fs-comp-form').style.display = 'none';
+};
+
+window.fsEditComp = function(i) {
+  const c = (S.futureScope.designCanvas.components || [])[i];
+  if (!c) return;
+  document.getElementById('fs-comp-form').style.display = 'block';
+  document.getElementById('fs-comp-form-label').textContent = 'Edit Component';
+  document.getElementById('fs-comp-edit-idx').value = String(i);
+  fsFillCompForm(c);
+  document.getElementById('fs-comp-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+window.fsDeleteComp = async function(i) {
+  if (!confirm('Delete this component?')) return;
+  const components = [...(S.futureScope.designCanvas.components || [])];
+  components.splice(i, 1);
+  try {
+    await db.collection('future_scope').doc('design-canvas').set({ components, lastUpdated: new Date().toISOString() }, { merge: true });
+    showToast('Component deleted.', 'success');
+  } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+};
+
+window.fsSaveComp = async function() {
+  const idx = parseInt(document.getElementById('fs-comp-edit-idx').value);
+  const linkedReactors = Array.from(document.querySelectorAll('.fs-comp-reactor'))
+    .filter(cb => cb.checked).map(cb => cb.value);
+  const components = [...(S.futureScope.designCanvas.components || [])];
+  const entry = {
+    id: idx >= 0 ? (components[idx].id || String(Date.now())) : String(Date.now()),
+    name:           document.getElementById('fs-comp-name').value.trim(),
+    description:    document.getElementById('fs-comp-desc').value,
+    linkedReactors: linkedReactors,
+    knowledgeSource:document.getElementById('fs-comp-source').value.trim(),
+    notes:          document.getElementById('fs-comp-notes').value
+  };
+  if (idx >= 0) { components[idx] = entry; } else { components.push(entry); }
+  try {
+    await db.collection('future_scope').doc('design-canvas').set({ components, lastUpdated: new Date().toISOString() }, { merge: true });
+    document.getElementById('fs-comp-form').style.display = 'none';
+    showToast('Component saved.', 'success');
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
 };
 
 /* ── ADMIN — ABOUT ─────────────────────────────────── */
@@ -4290,6 +4590,42 @@ const GV = (() => {
 
   function toggle() { if (isOpen) close(); else open(); }
 
+  /* ── reset ───────────────────────────────────────────
+     Immediate, animation-free teardown so a sidebar nav
+     click can never be blocked by the Graph View overlay. */
+  function reset() {
+    const gv   = el('graph-view');
+    const main = el('mainContent');
+
+    /* stop any running animation loop / timers */
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (counterTimer) { clearTimeout(counterTimer); counterTimer = null; }
+
+    /* full state reset */
+    isOpen = false;
+    inDetail = false;
+    focusIdx = 0;
+    detailIdx = 0;
+    parallaxTarget = { x: 0, y: 0 };
+    parallaxCurrent = { x: 0, y: 0 };
+
+    /* hide overlay instantly, restore document view */
+    if (gv) {
+      gv.style.transition = 'none';
+      gv.style.opacity = '0';
+      gv.style.display = 'none';
+    }
+    if (main) main.style.display = '';
+
+    const detail = getDetail();
+    if (detail) { detail.style.display = 'none'; detail.innerHTML = ''; }
+    const pw = el('gv-parallax');
+    if (pw) pw.style.transform = '';
+
+    const btn = el('gv-toggle-btn');
+    if (btn) { const lbl = btn.querySelector('.gv-btn-label'); if (lbl) lbl.textContent = 'Graph View'; }
+  }
+
   /* ── init ────────────────────────────────────────── */
   function init() {
     const gv = el('graph-view');
@@ -4299,9 +4635,10 @@ const GV = (() => {
   }
 
   init();
-  return { open, close, toggle };
+  return { open, close, toggle, reset, isActive: () => isOpen };
 })();
 window.GV = GV;
+window.resetGraphView = function () { if (window.GV) GV.reset(); };
 </script>
 
 <script>
