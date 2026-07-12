@@ -1194,6 +1194,154 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
   white-space: nowrap;
 }
 #gv-counter.gv-counter-visible { opacity: 1; }
+
+/* ── COMMENT SYSTEM (admin only) ──────────────────── */
+.profile-block, .glossary-entry, .about-card,
+#home-whatItIs, #home-whoItsFor, #home-howToUse, #future-body {
+  position: relative;
+  overflow: visible;
+}
+.dd-sec { position: relative; overflow: visible; }
+mark.cm-highlight {
+  background: rgba(200,136,32,0.22);
+  border-bottom: 1px solid var(--accent);
+  border-radius: 2px;
+  color: inherit;
+}
+.cm-icon {
+  position: absolute;
+  right: -26px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--accent);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity var(--ease), transform var(--ease);
+  user-select: none;
+  z-index: 20;
+}
+.cm-icon:hover { opacity: 1; transform: scale(1.15); }
+.cm-icon.cm-orphan { opacity: 0.3; filter: grayscale(1); text-decoration: line-through; }
+
+#cm-menu {
+  position: fixed;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 1300;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+  display: none;
+  min-width: 150px;
+}
+#cm-menu.cm-visible { display: block; }
+.cm-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text-1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 5px;
+  transition: background var(--ease);
+}
+.cm-menu-item:hover { background: rgba(255,255,255,0.06); color: var(--accent-lt); }
+
+#cm-input-box {
+  position: fixed;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  padding: 14px;
+  z-index: 1300;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.55);
+  display: none;
+  width: 288px;
+}
+#cm-input-box.cm-visible { display: block; }
+.cm-input-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-family: var(--mono);
+  margin-bottom: 8px;
+}
+#cm-ta {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text-1);
+  line-height: 1.5;
+  resize: none;
+  height: 74px;
+  outline: none;
+  transition: border-color var(--ease);
+}
+#cm-ta:focus { border-color: var(--accent-border); }
+.cm-input-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.cm-balloon {
+  position: fixed;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  z-index: 960;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  width: 264px;
+  animation: ddIn 160ms ease;
+}
+.cm-balloon-excerpt {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-3);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-balloon-text {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.65;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cm-balloon-edit-area { margin-top: 10px; }
+.cm-balloon-edit-area textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text-1);
+  line-height: 1.5;
+  resize: none;
+  height: 64px;
+  outline: none;
+  transition: border-color var(--ease);
+}
+.cm-balloon-edit-area textarea:focus { border-color: var(--accent-border); }
+.cm-balloon-actions { display: flex; gap: 8px; }
 </style>
 </head>
 <body>
@@ -1606,6 +1754,12 @@ function loadAll() {
     renderGlossary();
     if (S.isAdmin && S.adminTab === 'glossary' && S.adminView === 'list') renderAdminGlossary();
   });
+
+  db.collection('comments').onSnapshot(snap => {
+    const docs = {};
+    snap.forEach(d => { docs[d.id] = d.data(); });
+    if (window.CM) CM.refresh(docs);
+  }, err => console.warn('comments listener:', err));
 }
 
 /* ── RENDER — PUBLIC ───────────────────────────────── */
@@ -3939,6 +4093,333 @@ window.GV = GV;
       e.returnValue = '';
     }
   });
+})();
+</script>
+<script>
+/* ── CM — COMMENT SYSTEM ───────────────────────────────────────────────── */
+window.CM = (() => {
+  'use strict';
+  let cmDocs = {};          // docId → { context, field, selectedText, comment, createdAt }
+  let pendingMeta = null;   // { context, field, selectedText } awaiting save
+  let activeBalloon = null;
+  let applying = false;
+  let applyTimer = null;
+
+  const esc = s => s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  /* ── Public: refresh called by loadAll listener ────── */
+  function refresh(docs) { cmDocs = docs; scheduleApply(); }
+
+  /* ── Context/field resolution ──────────────────────── */
+  const FIELD_MAP = {
+    'design overview': 'designOverview',
+    'key materials': 'keyMaterials',
+    'operating conditions': 'operatingConditions',
+    'current status': 'currentStatus'
+  };
+  const HOME_MAP  = { 'home-whatItIs': 'whatItIs', 'home-whoItsFor': 'whoItsFor', 'home-howToUse': 'howToUse' };
+  const ABOUT_MAP = { 'about-whoBuiltThis': 'whoBuiltThis', 'about-why': 'why',
+                      'about-editorialApproach': 'editorialApproach', 'about-whatsNext': 'whatsNext' };
+
+  function getBlockMeta(el) {
+    // Drilldown popup section
+    const popup = el.closest('.dd-popup');
+    if (popup) {
+      const ctx = popup.querySelector('.dd-head-label')?.textContent?.trim() || '';
+      const sec = el.closest('.dd-sec');
+      const fl  = sec?.querySelector('.dd-sec-label')?.textContent?.trim().toLowerCase() || '';
+      return { context: ctx, field: fl };
+    }
+    // Reactor profile
+    if (el.closest('#profile-content') && S.selectedReactor) {
+      const block = el.closest('.profile-block');
+      const lbl = block?.querySelector('.block-label')?.textContent?.trim().toLowerCase() || '';
+      return { context: S.selectedReactor, field: FIELD_MAP[lbl] || lbl };
+    }
+    // Home
+    for (const [id, field] of Object.entries(HOME_MAP))
+      if (el.closest('#' + id)) return { context: 'home', field };
+    // About
+    for (const [id, field] of Object.entries(ABOUT_MAP))
+      if (el.closest('#' + id)) return { context: 'about', field };
+    // Future
+    if (el.closest('#future-body')) return { context: 'future', field: 'body' };
+    // Glossary
+    const ge = el.closest('.glossary-entry');
+    if (ge) {
+      const term = ge.querySelector('.glossary-term')?.textContent?.trim() || '';
+      return { context: 'glossary', field: term };
+    }
+    return null;
+  }
+
+  function getSelectionMeta() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return null;
+    const text = sel.toString().trim();
+    if (!text) return null;
+    const anchor = sel.anchorNode;
+    const el = anchor.nodeType === 3 ? anchor.parentElement : anchor;
+    const meta = getBlockMeta(el);
+    return meta ? { ...meta, selectedText: text } : null;
+  }
+
+  /* ── Comment queries ───────────────────────────────── */
+  function forBlock(context, field) {
+    return Object.entries(cmDocs)
+      .filter(([, d]) => d.context === context && d.field === field);
+  }
+
+  /* ── Apply decorations ─────────────────────────────── */
+  function scheduleApply() {
+    clearTimeout(applyTimer);
+    applyTimer = setTimeout(doApply, 100);
+  }
+
+  function iconContainerFor(el) {
+    return el.closest('.profile-block')
+        || el.closest('.dd-sec')
+        || el.closest('.glossary-entry')
+        || el.closest('.about-card')
+        || el.parentElement;
+  }
+
+  function doApply() {
+    if (!S.isAdmin) return;
+    applying = true;
+    obs.disconnect();
+    try {
+      document.querySelectorAll('#mainContent .content-block').forEach(decorateBlock);
+      document.querySelectorAll('.dd-popup .dd-sec-text').forEach(decorateBlock);
+    } finally {
+      applying = false;
+      obs.observe(document.body, OBS_OPTS);
+    }
+  }
+
+  function decorateBlock(block) {
+    // Strip existing marks
+    block.querySelectorAll('mark.cm-highlight').forEach(m => {
+      const frag = document.createDocumentFragment();
+      while (m.firstChild) frag.appendChild(m.firstChild);
+      m.parentNode.replaceChild(frag, m);
+    });
+    block.normalize();
+
+    // Strip existing icons from container
+    const container = iconContainerFor(block);
+    if (container) container.querySelectorAll('.cm-icon').forEach(i => i.remove());
+
+    const meta = getBlockMeta(block);
+    if (!meta) return;
+    const entries = forBlock(meta.context, meta.field);
+    if (!entries.length) return;
+
+    // Apply highlights via innerHTML replace
+    let html = block.innerHTML;
+    entries.forEach(([docId, doc]) => {
+      if (!doc.selectedText) return;
+      const escaped = esc(doc.selectedText);
+      if (html.includes(escaped)) {
+        html = html.replace(escaped,
+          `<mark class="cm-highlight" data-cm-id="${docId}">${escaped}</mark>`);
+      }
+    });
+    block.innerHTML = html;
+
+    // Inject icons into container
+    if (container) {
+      container.style.position = 'relative';
+      entries.forEach(([docId, doc], i) => {
+        const found = !!block.querySelector(`[data-cm-id="${docId}"]`);
+        const icon = document.createElement('span');
+        icon.className = 'cm-icon' + (found ? '' : ' cm-orphan');
+        icon.textContent = '💬';
+        icon.dataset.cmId = docId;
+        icon.style.top = (i * 22) + 'px';
+        icon.addEventListener('click', e => { e.stopPropagation(); showBalloon(docId, icon); });
+        container.appendChild(icon);
+      });
+    }
+  }
+
+  /* ── MutationObserver ──────────────────────────────── */
+  const OBS_OPTS = { childList: true, subtree: true };
+  const obs = new MutationObserver(() => { if (S.isAdmin && !applying) scheduleApply(); });
+  obs.observe(document.body, OBS_OPTS);
+
+  /* ── Context menu ──────────────────────────────────── */
+  const menu = (() => {
+    const el = document.createElement('div');
+    el.id = 'cm-menu';
+    el.innerHTML = `<button class="cm-menu-item" id="cm-add-btn">💬 Add Comment</button>`;
+    document.body.appendChild(el);
+    el.querySelector('#cm-add-btn').addEventListener('click', () => {
+      hideMenu();
+      if (!pendingMeta) return;
+      const sel = window.getSelection();
+      let x = window.innerWidth / 2, y = window.innerHeight / 2;
+      if (sel && !sel.isCollapsed) {
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        x = r.left; y = r.bottom + 6;
+      }
+      showInputBox(x, y);
+    });
+    return el;
+  })();
+
+  function showMenu(x, y) {
+    menu.style.left = Math.min(x, window.innerWidth - 180) + 'px';
+    menu.style.top  = Math.min(y, window.innerHeight - 60) + 'px';
+    menu.classList.add('cm-visible');
+  }
+  function hideMenu() { menu.classList.remove('cm-visible'); }
+
+  /* ── Input box ─────────────────────────────────────── */
+  const inputBox = (() => {
+    const el = document.createElement('div');
+    el.id = 'cm-input-box';
+    el.innerHTML = `
+      <div class="cm-input-label">Add Comment</div>
+      <textarea id="cm-ta" placeholder="Type your comment…"></textarea>
+      <div class="cm-input-actions">
+        <button class="btn-ghost" style="font-size:12px;padding:5px 12px" id="cm-cancel-btn">Cancel</button>
+        <button class="btn-save"  style="font-size:12px;padding:5px 12px" id="cm-save-btn">Save</button>
+      </div>`;
+    document.body.appendChild(el);
+    el.querySelector('#cm-cancel-btn').addEventListener('click', hideInputBox);
+    el.querySelector('#cm-save-btn').addEventListener('click', () => {
+      saveComment(el.querySelector('#cm-ta').value);
+    });
+    return el;
+  })();
+
+  function showInputBox(x, y) {
+    const bw = 288, bh = 150;
+    inputBox.style.left = Math.min(x, window.innerWidth  - bw - 12) + 'px';
+    inputBox.style.top  = Math.min(y, window.innerHeight - bh - 12) + 'px';
+    inputBox.classList.add('cm-visible');
+    const ta = inputBox.querySelector('#cm-ta');
+    ta.value = '';
+    ta.focus();
+  }
+  function hideInputBox() {
+    inputBox.classList.remove('cm-visible');
+    pendingMeta = null;
+  }
+
+  /* ── Balloon ───────────────────────────────────────── */
+  function showBalloon(docId, iconEl) {
+    closeBalloon();
+    const doc = cmDocs[docId];
+    if (!doc) return;
+
+    const el = document.createElement('div');
+    el.className = 'cm-balloon';
+    el.dataset.cmBalloon = docId;
+    const excerpt = (doc.selectedText || '').slice(0, 55) + ((doc.selectedText || '').length > 55 ? '…' : '');
+    el.innerHTML = `
+      <div class="cm-balloon-excerpt">"${esc(excerpt)}"</div>
+      <div class="cm-balloon-text" id="cmbt-${docId}">${esc(doc.comment)}</div>
+      <div class="cm-balloon-edit-area" id="cmbe-${docId}" style="display:none">
+        <textarea id="cmbta-${docId}">${esc(doc.comment)}</textarea>
+        <div class="cm-input-actions">
+          <button class="btn-ghost" style="font-size:11px;padding:4px 10px" onclick="CM.cancelEdit('${docId}')">Cancel</button>
+          <button class="btn-save"  style="font-size:11px;padding:4px 10px" onclick="CM.saveEdit('${docId}')">Save</button>
+        </div>
+      </div>
+      <div class="cm-balloon-actions">
+        <button class="btn-outline" style="font-size:11px;padding:5px 11px" onclick="CM.editComment('${docId}')">Edit</button>
+        <button class="btn-danger"  style="font-size:11px;padding:5px 11px" onclick="CM.deleteComment('${docId}')">Delete</button>
+      </div>`;
+    document.body.appendChild(el);
+    activeBalloon = el;
+
+    const rect = iconEl.getBoundingClientRect();
+    const bw = 264, bh = 180;
+    let left = rect.right + 10;
+    let top  = rect.top;
+    if (left + bw > window.innerWidth - 10) left = rect.left - bw - 10;
+    if (top  + bh > window.innerHeight - 10) top = window.innerHeight - bh - 10;
+    el.style.left = left + 'px';
+    el.style.top  = top  + 'px';
+  }
+
+  function closeBalloon() {
+    if (activeBalloon) { activeBalloon.remove(); activeBalloon = null; }
+  }
+
+  /* ── CRUD ──────────────────────────────────────────── */
+  async function saveComment(text) {
+    if (!pendingMeta || !text.trim()) return;
+    try {
+      await db.collection('comments').add({
+        context:      pendingMeta.context,
+        field:        pendingMeta.field,
+        selectedText: pendingMeta.selectedText,
+        comment:      text.trim(),
+        createdAt:    firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (err) { alert('Save failed: ' + err.message); }
+    hideInputBox();
+  }
+
+  function editComment(docId) {
+    document.getElementById('cmbt-' + docId).style.display = 'none';
+    document.getElementById('cmbe-' + docId).style.display = '';
+    document.getElementById('cmbta-' + docId).focus();
+  }
+
+  function cancelEdit(docId) {
+    document.getElementById('cmbt-' + docId).style.display = '';
+    document.getElementById('cmbe-' + docId).style.display = 'none';
+  }
+
+  async function saveEdit(docId) {
+    const text = document.getElementById('cmbta-' + docId)?.value?.trim();
+    if (!text) return;
+    try {
+      await db.collection('comments').doc(docId).update({ comment: text });
+      closeBalloon();
+    } catch (err) { alert('Update failed: ' + err.message); }
+  }
+
+  async function deleteComment(docId) {
+    if (!confirm('Delete this comment?')) return;
+    try {
+      await db.collection('comments').doc(docId).delete();
+      closeBalloon();
+    } catch (err) { alert('Delete failed: ' + err.message); }
+  }
+
+  /* ── Global event listeners ────────────────────────── */
+  document.addEventListener('contextmenu', e => {
+    if (!S.isAdmin) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+    const meta = getSelectionMeta();
+    if (!meta) return;
+    e.preventDefault();
+    pendingMeta = meta;
+    showMenu(e.clientX, e.clientY);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#cm-menu'))     hideMenu();
+    if (!e.target.closest('#cm-input-box')) { /* keep open until explicit cancel/save */ }
+    if (!e.target.closest('.cm-balloon') && !e.target.closest('.cm-icon')) closeBalloon();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { hideMenu(); hideInputBox(); closeBalloon(); }
+    if (e.key === 'Enter' && !e.shiftKey && document.activeElement === document.getElementById('cm-ta')) {
+      e.preventDefault();
+      saveComment(document.getElementById('cm-ta').value);
+    }
+  });
+
+  return { refresh, editComment, cancelEdit, saveEdit, deleteComment };
 })();
 </script>
 </body>
