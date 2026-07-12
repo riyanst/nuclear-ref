@@ -390,6 +390,60 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
   margin: 0 auto 16px; color: var(--text-3);
 }
 
+/* Future Scope public blocks */
+.fs-concept { margin-bottom: 48px; }
+.fs-concept h2 { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--text-1); margin-bottom: 16px; }
+
+.fs-track-block {
+  border-left: 2px solid var(--accent-border);
+  padding: 24px 28px; margin-bottom: 28px;
+  background: var(--bg-2); border-radius: 0 8px 8px 0;
+}
+.fs-track-tag {
+  font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 12px;
+}
+.fs-track-title { font-size: 18px; font-weight: 500; color: var(--text-1); margin-bottom: 4px; }
+.fs-track-subtitle { font-size: 12px; color: var(--text-3); margin-bottom: 14px; font-family: 'IBM Plex Mono', monospace; }
+.fs-track-body { font-size: 14px; color: var(--text-2); line-height: 1.8; white-space: pre-wrap; }
+
+.fs-convergence {
+  text-align: center; padding: 40px 36px; margin: 40px 0;
+  background: var(--bg-3); border: 1px solid var(--accent-border);
+  border-radius: 10px;
+}
+.fs-convergence h2 { font-size: 18px; font-weight: 500; color: var(--accent-lt); margin-bottom: 16px; }
+.fs-convergence p { font-size: 14px; color: var(--text-2); line-height: 1.85; max-width: 620px; margin: 0 auto; white-space: pre-wrap; }
+
+.fs-divider { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+.fs-subsection { margin-bottom: 48px; }
+.fs-subsection img { width: 100%; border-radius: 8px; margin-bottom: 20px; display: block; }
+.fs-subsection-title { font-size: 18px; font-weight: 500; color: var(--text-1); margin-bottom: 12px; }
+.fs-subsection-body { font-size: 14px; color: var(--text-2); line-height: 1.8; white-space: pre-wrap; }
+
+/* Admin sub-card within admin-content */
+.fs-adm-card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 24px 24px 20px; margin-bottom: 20px;
+}
+.fs-adm-card-title {
+  font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 18px;
+}
+.fs-sub-item {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid var(--border);
+}
+.fs-sub-item:last-child { border-bottom: none; }
+.fs-sub-item-info { flex: 1; min-width: 0; }
+.fs-sub-item-title { font-size: 13px; font-weight: 500; color: var(--text-1); }
+.fs-sub-item-body { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; margin-top: 3px; }
+.fs-sub-inline-form {
+  background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px; margin-top: 14px;
+}
+
 /* ── ABOUT ─────────────────────────────────────────── */
 .about-card {
   background: var(--bg-2); border: 1px solid var(--border);
@@ -1494,16 +1548,9 @@ mark.cm-highlight {
     <!-- FUTURE SCOPE -->
     <section id="future" class="section">
       <div class="eyebrow">Technology / Future Scope</div>
-      <h1 class="page-title">Compact <strong>fusion research.</strong></h1>
-      <p class="page-subtitle">The frontier beyond fission — emerging research programmes pursuing compact, practical fusion energy.</p>
-      <div id="future-body">
-        <div class="coming-soon-block">
-          <div class="coming-icon">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg>
-          </div>
-          <div style="font-size:12px;color:var(--text-3)">Content in preparation</div>
-        </div>
-      </div>
+      <h1 class="page-title">Future <strong>scope.</strong></h1>
+      <p class="page-subtitle">Where demonstrated nuclear engineering meets fusion research — the ART Corp convergence framework.</p>
+      <div id="future-body"></div>
     </section>
 
     <!-- GLOSSARY -->
@@ -1590,6 +1637,7 @@ const storage = firebase.storage();
 /* ── STATE ─────────────────────────────────────────── */
 const S = {
   home: {}, future: {}, about: {},
+  futureScope: { conceptOverview: {}, trace: {}, forge: {}, convergence: {}, subsections: [] },
   reactors: [], glossary: [],
   currentSection: 'home',
   selectedReactor: null,
@@ -1696,25 +1744,57 @@ function showToast(msg, type) {
 async function seedIfNeeded() {
   try {
     const snap = await db.collection('pages').doc('home').get();
-    if (snap.exists) return;
+    if (!snap.exists) {
+      const batch = db.batch();
+      batch.set(db.collection('pages').doc('home'),   { whatItIs: '', whoItsFor: '', howToUse: '' });
+      batch.set(db.collection('pages').doc('future'),  { body: '' });
+      batch.set(db.collection('pages').doc('about'),   { whoBuiltThis: '', why: '', editorialApproach: '', whatsNext: '' });
 
-    const batch = db.batch();
-    batch.set(db.collection('pages').doc('home'),   { whatItIs: '', whoItsFor: '', howToUse: '' });
-    batch.set(db.collection('pages').doc('future'),  { body: '' });
-    batch.set(db.collection('pages').doc('about'),   { whoBuiltThis: '', why: '', editorialApproach: '', whatsNext: '' });
+      SEED_REACTORS.forEach(r => {
+        const { id, ...data } = r;
+        batch.set(db.collection('reactors').doc(id), data);
+      });
 
-    SEED_REACTORS.forEach(r => {
-      const { id, ...data } = r;
-      batch.set(db.collection('reactors').doc(id), data);
-    });
+      SEED_GLOSSARY.forEach(g => {
+        const { id, ...data } = g;
+        batch.set(db.collection('glossary').doc(id), data);
+      });
 
-    SEED_GLOSSARY.forEach(g => {
-      const { id, ...data } = g;
-      batch.set(db.collection('glossary').doc(id), data);
-    });
-
-    await batch.commit();
+      await batch.commit();
+    }
   } catch (e) { console.warn('Seed error:', e); }
+
+  /* Seed future_scope if not yet populated — runs independently */
+  try {
+    const coSnap = await db.collection('future_scope').doc('concept-overview').get();
+    if (!coSnap.exists) {
+      const fsBatch = db.batch();
+      fsBatch.set(db.collection('future_scope').doc('concept-overview'), {
+        title: 'Concept Overview',
+        body: 'The existing reactor profiles on this platform represent the current frontier of demonstrated nuclear technology. The ART Corp Compact Fusion Concept approaches the same energy problem from the opposite direction — starting from an ideal fuel source (seawater-derived deuterium, effectively limitless) and working backwards toward a buildable design. Where these two approaches converge is the research objective.',
+        lastUpdated: new Date().toISOString()
+      });
+      fsBatch.set(db.collection('future_scope').doc('trace'), {
+        title: 'TRACE',
+        subtitle: 'Technology Reference and Comparative Engineering',
+        body: 'The reactor profiles on this platform — NERVA, Kilopower, DRACO, Rolls-Royce SMR, SR-1 Freedom — represent demonstrated or near-demonstrated nuclear technology. Each profile is built from primary sources, working from verified knowledge toward engineering reality.',
+        lastUpdated: new Date().toISOString()
+      });
+      fsBatch.set(db.collection('future_scope').doc('forge'), {
+        title: 'FORGE',
+        subtitle: 'Fusion Originated Research and Generative Engineering',
+        body: 'The ART Corp Compact Fusion Concept starts from the opposite end. Beginning with the ideal: seawater-derived deuterium as a practically limitless fuel source, the design works backwards toward a buildable compact tokamak. Primary fuel: D-T. Secondary capability: D-D. Internal tritium production via lithium breeding blanket.',
+        lastUpdated: new Date().toISOString()
+      });
+      fsBatch.set(db.collection('future_scope').doc('convergence'), {
+        title: 'Convergence',
+        body: 'TRACE and FORGE are not separate tracks. They are two directions converging on a single point — a compact fusion reactor design that is grounded in demonstrated engineering reality and built toward from first principles. The convergence of these two methodologies is the ART Corp research objective and the basis of the forthcoming review paper.',
+        lastUpdated: new Date().toISOString()
+      });
+      fsBatch.set(db.collection('future_scope').doc('subsections'), { items: [] });
+      await fsBatch.commit();
+    }
+  } catch (e) { console.warn('Future scope seed error:', e); }
 }
 
 /* ── LOAD ──────────────────────────────────────────── */
@@ -1727,6 +1807,20 @@ function loadAll() {
 
   db.collection('pages').doc('future').onSnapshot(snap => {
     S.future = snap.data() || {};
+  });
+
+  /* future_scope collection — one listener per doc */
+  ['concept-overview','trace','forge','convergence'].forEach(docId => {
+    db.collection('future_scope').doc(docId).onSnapshot(snap => {
+      const key = docId.replace(/-([a-z])/g, (_,c) => c.toUpperCase()); // concept-overview→conceptOverview
+      S.futureScope[key] = snap.data() || {};
+      renderFuture();
+      if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
+    });
+  });
+  db.collection('future_scope').doc('subsections').onSnapshot(snap => {
+    const d = snap.data() || {};
+    S.futureScope.subsections = d.items || [];
     renderFuture();
     if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
   });
@@ -1770,14 +1864,71 @@ function renderHome() {
 }
 
 function renderFuture() {
-  const body = S.future.body;
   const el = document.getElementById('future-body');
   if (!el) return;
-  if (body && body.trim()) {
-    el.innerHTML = '<div class="content-block">' + esc(body) + '</div>';
-  } else {
-    el.innerHTML = '<div class="coming-soon-block"><div class="coming-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg></div><div style="font-size:12px;color:var(--text-3)">Content in preparation</div></div>';
+  const fs = S.futureScope;
+  const co = fs.conceptOverview || {};
+  const tr = fs.trace || {};
+  const fo = fs.forge || {};
+  const cv = fs.convergence || {};
+  const subs = fs.subsections || [];
+
+  let html = '';
+
+  /* 1. Concept Overview */
+  if (co.title || co.body) {
+    html += '<div class="fs-concept">';
+    if (co.title) html += '<h2>' + esc(co.title) + '</h2>';
+    if (co.body)  html += '<div class="content-block">' + esc(co.body) + '</div>';
+    html += '</div>';
   }
+
+  /* 2. TRACE */
+  if (tr.title || tr.body) {
+    html += '<div class="fs-track-block">';
+    html += '<div class="fs-track-tag">TRACE — Technology Reference and Comparative Engineering</div>';
+    if (tr.title)    html += '<div class="fs-track-title">' + esc(tr.title) + '</div>';
+    if (tr.subtitle) html += '<div class="fs-track-subtitle">' + esc(tr.subtitle) + '</div>';
+    if (tr.body)     html += '<div class="fs-track-body">' + esc(tr.body) + '</div>';
+    html += '</div>';
+  }
+
+  /* 3. FORGE */
+  if (fo.title || fo.body) {
+    html += '<div class="fs-track-block">';
+    html += '<div class="fs-track-tag">FORGE — Fusion Originated Research and Generative Engineering</div>';
+    if (fo.title)    html += '<div class="fs-track-title">' + esc(fo.title) + '</div>';
+    if (fo.subtitle) html += '<div class="fs-track-subtitle">' + esc(fo.subtitle) + '</div>';
+    if (fo.body)     html += '<div class="fs-track-body">' + esc(fo.body) + '</div>';
+    html += '</div>';
+  }
+
+  /* 4. Convergence */
+  if (cv.title || cv.body) {
+    html += '<div class="fs-convergence">';
+    if (cv.title) html += '<h2>' + esc(cv.title) + '</h2>';
+    if (cv.body)  html += '<p>' + esc(cv.body) + '</p>';
+    html += '</div>';
+  }
+
+  /* 5. Subsections */
+  if (subs.length) {
+    html += '<hr class="fs-divider">';
+    subs.forEach((sub, i) => {
+      html += '<div class="fs-subsection">';
+      if (sub.imageURL) html += '<img src="' + esc(sub.imageURL) + '" alt="' + esc(sub.title || '') + '">';
+      if (sub.title) html += '<div class="fs-subsection-title">' + esc(sub.title) + '</div>';
+      if (sub.body)  html += '<div class="fs-subsection-body">' + esc(sub.body) + '</div>';
+      html += '</div>';
+      if (i < subs.length - 1) html += '<hr class="fs-divider">';
+    });
+  }
+
+  if (!html) {
+    html = '<div class="coming-soon-block"><div class="coming-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg></div><div style="font-size:12px;color:var(--text-3)">Content in preparation</div></div>';
+  }
+
+  el.innerHTML = html;
 }
 
 function renderAbout() {
@@ -1968,12 +2119,177 @@ function renderAdminHome() {
 
 /* ── ADMIN — FUTURE ────────────────────────────────── */
 function renderAdminFuture() {
+  const fs = S.futureScope;
+  const co = fs.conceptOverview || {};
+  const tr = fs.trace || {};
+  const fo = fs.forge || {};
+  const cv = fs.convergence || {};
+  const subs = fs.subsections || [];
+
+  const field = (id, label, val, rows) =>
+    `<div class="admin-field"><label class="admin-label">${label}</label>
+      <textarea class="admin-textarea" id="${id}" rows="${rows||5}">${esc(val||'')}</textarea></div>`;
+
+  const subsItems = subs.map((s, i) => `
+    <div class="fs-sub-item" id="fs-sub-item-${i}">
+      <div class="fs-sub-item-info">
+        <div class="fs-sub-item-title">${esc(s.title||'(untitled)')}</div>
+        <div class="fs-sub-item-body">${esc(s.body||'')}</div>
+      </div>
+      <div class="admin-item-actions">
+        <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="fsEditSub(${i})">Edit</button>
+        <button class="btn-danger" style="font-size:11px;padding:5px 10px" onclick="fsDeleteSub(${i})">Delete</button>
+      </div>
+    </div>`).join('');
+
   setHTML('admin-content', `
-    <div class="admin-field"><label class="admin-label">Body text</label>
-      <textarea class="admin-textarea" id="adm-futureBody" rows="10">${esc(S.future.body||'')}</textarea>
-      <div class="admin-save-row"><button class="btn-save" onclick="savePageField('future','body','adm-futureBody')">Save</button></div>
-    </div>`);
+    <!-- Card 1: Concept Overview -->
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">Concept Overview</div>
+      ${field('fs-co-title','Title',co.title)}
+      ${field('fs-co-body','Body',co.body,8)}
+      <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('concept-overview',['title','body'],['fs-co-title','fs-co-body'])">Save</button></div>
+    </div>
+
+    <!-- Card 2: TRACE -->
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">TRACE</div>
+      ${field('fs-tr-title','Title',tr.title)}
+      ${field('fs-tr-subtitle','Subtitle',tr.subtitle,2)}
+      ${field('fs-tr-body','Body',tr.body,7)}
+      <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('trace',['title','subtitle','body'],['fs-tr-title','fs-tr-subtitle','fs-tr-body'])">Save</button></div>
+    </div>
+
+    <!-- Card 3: FORGE -->
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">FORGE</div>
+      ${field('fs-fo-title','Title',fo.title)}
+      ${field('fs-fo-subtitle','Subtitle',fo.subtitle,2)}
+      ${field('fs-fo-body','Body',fo.body,7)}
+      <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('forge',['title','subtitle','body'],['fs-fo-title','fs-fo-subtitle','fs-fo-body'])">Save</button></div>
+    </div>
+
+    <!-- Card 4: Convergence -->
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">Convergence</div>
+      ${field('fs-cv-title','Title',cv.title)}
+      ${field('fs-cv-body','Body',cv.body,7)}
+      <div class="admin-save-row"><button class="btn-save" onclick="fsSaveBlock('convergence',['title','body'],['fs-cv-title','fs-cv-body'])">Save</button></div>
+    </div>
+
+    <!-- Card 5: Subsections -->
+    <div class="fs-adm-card">
+      <div class="fs-adm-card-title">Subsections</div>
+      <div id="fs-sub-list">${subsItems || '<div style="font-size:13px;color:var(--text-3);padding:8px 0">No subsections yet.</div>'}</div>
+      <div style="margin-top:16px">
+        <button class="btn-outline" style="font-size:12px" onclick="fsShowAddSub()">+ Add Subsection</button>
+      </div>
+      <div id="fs-sub-form" style="display:none" class="fs-sub-inline-form">
+        <div style="font-size:11px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:14px" id="fs-sub-form-label">New Subsection</div>
+        <input type="hidden" id="fs-sub-edit-idx" value="-1">
+        ${field('fs-sub-title','Title','')}
+        ${field('fs-sub-body','Body','',6)}
+        <div class="admin-field">
+          <label class="admin-label">Image</label>
+          <input class="admin-input" id="fs-sub-imageURL" type="text" placeholder="Paste image URL, or upload below" value="">
+          <div style="margin-top:8px;display:flex;align-items:center;gap:10px">
+            <button class="btn-outline" style="font-size:11px;padding:5px 10px" onclick="document.getElementById('fs-sub-img-file').click()">Upload image</button>
+            <input type="file" id="fs-sub-img-file" accept="image/*" style="display:none" onchange="fsUploadSubImage(this)">
+            <span id="fs-sub-img-progress" style="font-size:11px;color:var(--text-3)"></span>
+          </div>
+        </div>
+        <div class="admin-save-row" style="gap:10px">
+          <button class="btn-ghost" style="font-size:12px" onclick="fsCancelSub()">Cancel</button>
+          <button class="btn-save" onclick="fsSaveSub()">Save Subsection</button>
+        </div>
+      </div>
+    </div>
+  `);
 }
+
+/* ── FUTURE SCOPE SAVE HELPERS ─────────────────────── */
+window.fsSaveBlock = async function(docId, fields, elIds) {
+  const data = { lastUpdated: new Date().toISOString() };
+  fields.forEach((f, i) => { data[f] = document.getElementById(elIds[i]).value; });
+  try {
+    await db.collection('future_scope').doc(docId).set(data, { merge: true });
+    showToast('Saved.', 'success');
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+};
+
+window.fsShowAddSub = function() {
+  document.getElementById('fs-sub-form').style.display = 'block';
+  document.getElementById('fs-sub-form-label').textContent = 'New Subsection';
+  document.getElementById('fs-sub-edit-idx').value = '-1';
+  document.getElementById('fs-sub-title').value = '';
+  document.getElementById('fs-sub-body').value = '';
+  document.getElementById('fs-sub-imageURL').value = '';
+  document.getElementById('fs-sub-img-progress').textContent = '';
+};
+
+window.fsCancelSub = function() {
+  document.getElementById('fs-sub-form').style.display = 'none';
+};
+
+window.fsEditSub = function(i) {
+  const s = S.futureScope.subsections[i];
+  if (!s) return;
+  document.getElementById('fs-sub-form').style.display = 'block';
+  document.getElementById('fs-sub-form-label').textContent = 'Edit Subsection';
+  document.getElementById('fs-sub-edit-idx').value = String(i);
+  document.getElementById('fs-sub-title').value = s.title || '';
+  document.getElementById('fs-sub-body').value = s.body || '';
+  document.getElementById('fs-sub-imageURL').value = s.imageURL || '';
+  document.getElementById('fs-sub-img-progress').textContent = '';
+  document.getElementById('fs-sub-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+window.fsDeleteSub = async function(i) {
+  if (!confirm('Delete this subsection?')) return;
+  const items = [...S.futureScope.subsections];
+  items.splice(i, 1);
+  try {
+    await db.collection('future_scope').doc('subsections').set({ items });
+    showToast('Subsection deleted.', 'success');
+  } catch (e) { showToast('Delete failed: ' + e.message, 'error'); }
+};
+
+window.fsSaveSub = async function() {
+  const idx = parseInt(document.getElementById('fs-sub-edit-idx').value);
+  const title    = document.getElementById('fs-sub-title').value.trim();
+  const body     = document.getElementById('fs-sub-body').value;
+  const imageURL = document.getElementById('fs-sub-imageURL').value.trim();
+  const items = [...S.futureScope.subsections];
+  const entry = { id: idx >= 0 ? (items[idx].id || String(Date.now())) : String(Date.now()), title, body, imageURL, lastUpdated: new Date().toISOString() };
+  if (idx >= 0) { items[idx] = entry; } else { items.push(entry); }
+  try {
+    await db.collection('future_scope').doc('subsections').set({ items });
+    document.getElementById('fs-sub-form').style.display = 'none';
+    showToast('Subsection saved.', 'success');
+  } catch (e) { showToast('Save failed: ' + e.message, 'error'); }
+};
+
+window.fsUploadSubImage = function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const id = document.getElementById('fs-sub-edit-idx').value;
+  const entryId = id >= 0 ? (S.futureScope.subsections[parseInt(id)]?.id || String(Date.now())) : String(Date.now());
+  const path = 'future-scope/subsections/' + entryId + '/' + file.name.replace(/[^\w.\-]+/g, '_');
+  const prog = document.getElementById('fs-sub-img-progress');
+  prog.textContent = '0%';
+  const task = storage.ref(path).put(file, { contentType: file.type || undefined });
+  task.on('state_changed',
+    snap => { prog.textContent = snap.totalBytes ? Math.round(snap.bytesTransferred / snap.totalBytes * 100) + '%' : '…'; },
+    err => { prog.textContent = 'Upload failed'; showToast('Upload failed: ' + err.message, 'error'); },
+    async () => {
+      try {
+        const url = await task.snapshot.ref.getDownloadURL();
+        document.getElementById('fs-sub-imageURL').value = url;
+        prog.textContent = 'Uploaded ✓';
+        showToast('Image uploaded — click Save Subsection to keep it.', 'success');
+      } catch (e) { prog.textContent = 'URL error'; }
+    });
+};
 
 /* ── ADMIN — ABOUT ─────────────────────────────────── */
 function renderAdminAbout() {
