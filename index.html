@@ -308,6 +308,8 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .card-title { font-size: 15px; font-weight: 500; color: var(--text-1); margin-bottom: 7px; letter-spacing: -0.015em; }
 .card-desc  { font-size: 12.5px; color: var(--text-3); line-height: 1.65; }
 .card-cta   { margin-top: 18px; font-size: 12.5px; color: var(--accent); }
+.card-badge-slot { margin-bottom: 14px; }
+.fs-card-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 /* ── REACTOR PROFILES ──────────────────────────────── */
 .profile-header {
@@ -536,29 +538,8 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 }
 .forge-backlink:hover { background: rgba(245, 158, 11, 0.11); }
 
-/* Versions accordion */
-.fs-ver-card {
-  background: var(--bg-2); border: 1px solid var(--border);
-  border-radius: 10px; margin-bottom: 12px; overflow: hidden;
-}
-.fs-ver-card.open { border-color: var(--accent-border); }
-.fs-ver-header {
-  width: 100%; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 18px 20px; background: none; border: none; cursor: pointer;
-  text-align: left; color: inherit; font-family: inherit;
-}
-.fs-ver-header-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
-.fs-ver-header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.fs-ver-tag {
-  font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500;
-  color: var(--accent-lt);
-}
-.fs-ver-title { font-size: 15px; font-weight: 500; color: var(--text-1); }
-.fs-ver-chevron { color: var(--text-3); transition: transform 300ms ease; flex-shrink: 0; }
-.fs-ver-card.open .fs-ver-chevron { transform: rotate(180deg); }
-.fs-ver-body { max-height: 0; overflow: hidden; transition: max-height 300ms ease; }
-.fs-ver-body-inner { padding: 4px 20px 22px; border-top: 1px solid var(--border); }
-.fs-ver-objective { font-size: 14px; color: var(--text-2); line-height: 1.75; margin: 18px 0; white-space: pre-wrap; }
+/* Version profile — objective text */
+.fs-ver-objective { font-size: 15px; color: var(--text-2); line-height: 1.8; margin: 18px 0 0; white-space: pre-wrap; }
 
 /* Status pills */
 .fs-status-pill {
@@ -583,8 +564,7 @@ nav { flex: 1; padding: 12px 0; overflow-y: auto; }
 .fs-ver-canvas { margin: 20px 0; }
 .fs-ver-canvas-thumb { max-width: 220px; width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
 .fs-ver-canvas-label { font-size: 11px; color: var(--text-3); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
-.fs-ver-notes { font-size: 13px; color: var(--text-3); font-style: italic; line-height: 1.7; white-space: pre-wrap; margin: 18px 0; }
-.fs-ver-foot { display: flex; justify-content: flex-end; margin-top: 16px; }
+.fs-ver-notes { font-size: 14px; color: var(--text-3); font-style: italic; line-height: 1.75; white-space: pre-wrap; margin: 18px 0; }
 
 @media (max-width: 640px) {
   .fs-param-table { grid-template-columns: 1fr; }
@@ -1736,6 +1716,11 @@ mark.cm-highlight {
       <div id="future-body"></div>
     </section>
 
+    <!-- VERSION PROFILE (dynamic) -->
+    <section id="version-profile" class="section">
+      <div id="version-profile-content"></div>
+    </section>
+
     <!-- GLOSSARY -->
     <section id="glossary" class="section">
       <div class="eyebrow">Reference</div>
@@ -1837,6 +1822,7 @@ const S = {
   reactors: [], glossary: [],
   currentSection: 'home',
   selectedReactor: null,
+  selectedVersion: null,
   isAdmin: false,
   adminTab: 'home',
   adminView: 'list',    // 'list' | 'edit-reactor' | 'edit-glossary'
@@ -2063,6 +2049,10 @@ function loadAll() {
     S.futureScope.subsections = d.items || [];
     renderFuture();
     renderFutureSubnav();
+    if (S.currentSection === 'version-profile' && S.selectedVersion) {
+      const v = S.futureScope.subsections.find(x => x.id === S.selectedVersion);
+      if (v) renderVersionProfile(v); else show('future');
+    }
     if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
   });
   db.collection('future_scope').doc('design-canvas').onSnapshot(snap => {
@@ -2070,6 +2060,10 @@ function loadAll() {
     d.components = d.components || [];
     S.futureScope.designCanvas = d;
     renderFuture();
+    if (S.currentSection === 'version-profile' && S.selectedVersion) {
+      const v = S.futureScope.subsections.find(x => x.id === S.selectedVersion);
+      if (v) renderVersionProfile(v);
+    }
     if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
   });
 
@@ -2151,55 +2145,6 @@ function renderFuture() {
     html += '</div>';
   }
 
-  /* 3.5 Design Canvas — between FORGE and Convergence */
-  const dc = fs.designCanvas || {};
-  const dcVer = dc.version ? esc(dc.version) : 'v3';
-  {
-    html += '<div class="fs-canvas">';
-    html += '<div class="fs-canvas-tag">Design Canvas</div>';
-    if (dc.imageURL) {
-      html += '<div class="fs-canvas-img-wrap">';
-      html += '<div class="fs-canvas-ver">FORGE Concept ' + dcVer + '</div>';
-      html += '<img class="fs-canvas-img" src="' + esc(dc.imageURL) + '" alt="' + esc(dc.imageCaption || 'FORGE design canvas') + '">';
-      html += '</div>';
-      if (dc.imageCaption) html += '<div class="fs-canvas-caption">' + esc(dc.imageCaption) + '</div>';
-    } else {
-      html += '<div class="fs-canvas-placeholder">Design render pending — FORGE Concept ' + dcVer + ' in development</div>';
-    }
-
-    const comps = dc.components || [];
-    if (comps.length) {
-      html += '<h2 class="fs-canvas-heading">Component Analysis</h2>';
-      comps.forEach(c => {
-        html += '<div class="fs-comp-card">';
-        if (c.name) html += '<div class="fs-comp-name">' + esc(c.name) + '</div>';
-        if (c.description) html += '<div class="fs-comp-desc">' + esc(c.description) + '</div>';
-        const links = c.linkedReactors || [];
-        if (links.length) {
-          html += '<div class="fs-comp-connected"><span class="fs-comp-connected-lbl">Connected to:</span>';
-          links.forEach(rn => {
-            html += '<button class="fs-comp-badge" onclick="navToReactorByName(\'' + esc(rn).replace(/'/g, "\\'") + '\')">' + esc(rn) + '</button>';
-          });
-          html += '</div>';
-        }
-        if (c.knowledgeSource) html += '<div class="fs-comp-source"><span class="fs-comp-source-lbl">Knowledge source:</span> ' + esc(c.knowledgeSource) + '</div>';
-        if (c.knowledgeLinkReactor) {
-          const sec = traceSectionBySlug(c.knowledgeLinkSection);
-          const rn = reactorNameById(c.knowledgeLinkReactor);
-          const secLabel = sec ? sec.label : (c.knowledgeLinkSection || '');
-          html += '<a class="fs-comp-tracelink" onclick="triggerTerritoryTransition('
-            + "'" + esc(c.knowledgeLinkReactor).replace(/'/g, "\\'") + "','"
-            + esc(c.knowledgeLinkSection || '').replace(/'/g, "\\'") + "',"
-            + JSON.stringify(c.knowledgeLinkSentence || '').replace(/"/g, '&quot;')
-            + ')">→ View in TRACE: ' + esc(rn) + ' — ' + esc(secLabel) + '</a>';
-        }
-        if (c.notes) html += '<div class="fs-comp-notes">' + esc(c.notes) + '</div>';
-        html += '</div>';
-      });
-    }
-    html += '</div>';
-  }
-
   /* 4. Convergence */
   if (cv.title || cv.body) {
     html += '<div class="fs-convergence">';
@@ -2208,12 +2153,12 @@ function renderFuture() {
     html += '</div>';
   }
 
-  /* 5. Versions — accordion below Convergence */
+  /* 5. Versions — index card grid below Convergence (mirrors reactor cards) */
   if (subs.length) {
     html += '<h2 class="fs-canvas-heading" style="margin-top:48px">Versions</h2>';
-    subs.forEach((v, i) => {
-      html += renderVersionCard(v, i, dc);
-    });
+    html += '<div class="card-grid">';
+    subs.forEach(v => { html += renderVersionCard(v); });
+    html += '</div>';
   }
 
   if (!html) {
@@ -2232,64 +2177,112 @@ function fsStatusPill(status) {
   return '<span class="fs-status-pill ' + cls + '">' + esc(s) + '</span>';
 }
 
-/* one Versions accordion card */
-function renderVersionCard(v, i, dc) {
+/* one Versions index card — mirrors reactor cards */
+function renderVersionCard(v) {
+  const ver = v.versionNumber || '';
+  return `
+    <button class="card" data-version-id="${esc(v.id || '')}" onclick="navToVersion('${esc(v.id || '')}')">
+      <div class="card-badge-slot">${fsStatusPill(v.status)}</div>
+      <div class="card-title"><strong>${esc(ver)}</strong> ${esc(v.title || '')}</div>
+      <div class="card-desc fs-card-clamp">${esc(v.objective || '')}</div>
+      <div class="card-cta">View version →</div>
+    </button>`;
+}
+
+/* one component card (shared by the version profile Component Analysis block) */
+function renderComponentCard(c) {
+  let html = '<div class="fs-comp-card">';
+  if (c.name) html += '<div class="fs-comp-name">' + esc(c.name) + '</div>';
+  if (c.description) html += '<div class="fs-comp-desc">' + esc(c.description) + '</div>';
+  const links = c.linkedReactors || [];
+  if (links.length) {
+    html += '<div class="fs-comp-connected"><span class="fs-comp-connected-lbl">Connected to:</span>';
+    links.forEach(rn => {
+      html += '<button class="fs-comp-badge" onclick="navToReactorByName(\'' + esc(rn).replace(/'/g, "\\'") + '\')">' + esc(rn) + '</button>';
+    });
+    html += '</div>';
+  }
+  if (c.knowledgeSource) html += '<div class="fs-comp-source"><span class="fs-comp-source-lbl">Knowledge source:</span> ' + esc(c.knowledgeSource) + '</div>';
+  if (c.knowledgeLinkReactor) {
+    const sec = traceSectionBySlug(c.knowledgeLinkSection);
+    const rn = reactorNameById(c.knowledgeLinkReactor);
+    const secLabel = sec ? sec.label : (c.knowledgeLinkSection || '');
+    html += '<a class="fs-comp-tracelink" onclick="triggerTerritoryTransition('
+      + "'" + esc(c.knowledgeLinkReactor).replace(/'/g, "\\'") + "','"
+      + esc(c.knowledgeLinkSection || '').replace(/'/g, "\\'") + "',"
+      + JSON.stringify(c.knowledgeLinkSentence || '').replace(/"/g, '&quot;')
+      + ')">→ View in TRACE: ' + esc(rn) + ' — ' + esc(secLabel) + '</a>';
+  }
+  if (c.notes) html += '<div class="fs-comp-notes">' + esc(c.notes) + '</div>';
+  html += '</div>';
+  return html;
+}
+
+/* full version profile page — mirrors reactor profile */
+function renderVersionProfile(v) {
+  const pc = document.getElementById('version-profile-content');
+  if (!pc || !v) return;
+  const dc = S.futureScope.designCanvas || {};
   const ver = v.versionNumber || '';
   const params = v.parameters || [];
-  let body = '';
 
-  if (v.objective) body += '<p class="fs-ver-objective">' + esc(v.objective) + '</p>';
+  let html = `
+    <div class="profile-header">
+      <div class="profile-nav">
+        <button class="back-btn" onclick="show('future')">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7.5 2L3.5 6l4 4"/></svg>
+          Future Scope
+        </button>
+        <span style="color:var(--border-md);font-size:12px">·</span>
+        ${fsStatusPill(v.status)}
+      </div>
+      <h1 class="profile-name">${esc(ver)}</h1>
+      <div class="profile-fullname">${esc(v.title || '')}</div>`;
+  if (v.objective) html += `<p class="fs-ver-objective">${esc(v.objective)}</p>`;
+  html += `</div>`;
 
+  /* Design Canvas block — only when this version links to the current canvas version */
+  if (v.designCanvasVersion && dc.version && v.designCanvasVersion === dc.version && dc.imageURL) {
+    html += '<div class="profile-block"><div class="block-label">Design Canvas</div>';
+    html += '<div class="fs-canvas-img-wrap">';
+    html += '<div class="fs-canvas-ver">FORGE Concept ' + esc(dc.version) + '</div>';
+    html += '<img class="fs-canvas-img" src="' + esc(dc.imageURL) + '" alt="' + esc(dc.imageCaption || 'FORGE design canvas') + '">';
+    html += '</div>';
+    if (dc.imageCaption) html += '<div class="fs-canvas-caption">' + esc(dc.imageCaption) + '</div>';
+    html += '</div>';
+  }
+
+  /* Component Analysis block */
+  const comps = dc.components || [];
+  if (comps.length) {
+    html += '<div class="profile-block"><div class="block-label">Component Analysis</div>';
+    comps.forEach(c => { html += renderComponentCard(c); });
+    html += '</div>';
+  }
+
+  /* Parameters table */
   if (params.length) {
-    body += '<div class="fs-param-table">';
-    body += '<div class="fs-param-cell fs-param-head">Parameter</div>'
+    html += '<div class="profile-block"><div class="block-label">Parameters</div>';
+    html += '<div class="fs-param-table">';
+    html += '<div class="fs-param-cell fs-param-head">Parameter</div>'
           + '<div class="fs-param-cell fs-param-head">TRACE Demonstrated</div>'
           + '<div class="fs-param-cell fs-param-head">FORGE Target</div>';
     params.forEach(p => {
-      body += '<div class="fs-param-cell fs-param-label">' + esc(p.label || '') + '</div>'
+      html += '<div class="fs-param-cell fs-param-label">' + esc(p.label || '') + '</div>'
             + '<div class="fs-param-cell">' + esc(p.traceValue || '') + '</div>'
             + '<div class="fs-param-cell">' + esc(p.forgeTarget || '') + '</div>';
     });
-    body += '</div>';
+    html += '</div></div>';
   }
 
-  /* Design Canvas thumbnail when the version links to the current canvas version */
-  if (v.designCanvasVersion && dc && dc.version && v.designCanvasVersion === dc.version && dc.imageURL) {
-    body += '<div class="fs-ver-canvas">'
-          + '<img class="fs-ver-canvas-thumb" src="' + esc(dc.imageURL) + '" alt="Design Canvas ' + esc(dc.version) + '">'
-          + '<div class="fs-ver-canvas-label">Design Canvas ' + esc(dc.version) + '</div>'
-          + '</div>';
+  /* Notes block */
+  if (v.notes) {
+    html += '<div class="profile-block"><div class="block-label">Notes</div>';
+    html += '<div class="fs-ver-notes">' + esc(v.notes) + '</div></div>';
   }
 
-  if (v.notes) body += '<div class="fs-ver-notes">' + esc(v.notes) + '</div>';
-
-  body += '<div class="fs-ver-foot">' + fsStatusPill(v.status) + '</div>';
-
-  return `
-    <div class="fs-ver-card" id="fs-ver-card-${i}" data-version-id="${esc(v.id || '')}">
-      <button class="fs-ver-header" onclick="fsToggleVersion(${i})">
-        <span class="fs-ver-header-left">
-          <span class="fs-ver-tag">${esc(ver)}</span>
-          <span class="fs-ver-title">${esc(v.title || '')}</span>
-        </span>
-        <span class="fs-ver-header-right">
-          ${fsStatusPill(v.status)}
-          <svg class="fs-ver-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 5.5L7 9l3.5-3.5"/></svg>
-        </span>
-      </button>
-      <div class="fs-ver-body" id="fs-ver-body-${i}">
-        <div class="fs-ver-body-inner">${body}</div>
-      </div>
-    </div>`;
+  pc.innerHTML = html;
 }
-
-window.fsToggleVersion = function(i) {
-  const card = document.getElementById('fs-ver-card-' + i);
-  const body = document.getElementById('fs-ver-body-' + i);
-  if (!card || !body) return;
-  const open = card.classList.toggle('open');
-  body.style.maxHeight = open ? (body.scrollHeight + 40) + 'px' : '0px';
-};
 
 function renderAbout() {
   setHTML('about-whoBuiltThis',      renderText(S.about.whoBuiltThis));
@@ -2410,23 +2403,18 @@ function renderFutureSubnav() {
     <button class="nav-sub-item" data-version-id="${esc(v.id)}" onclick="navToVersion('${esc(v.id)}')">${esc(versionShortLabel(v))}</button>`).join('');
 }
 
-/* navigate to Future Scope, open + reveal the matching version accordion card */
+/* navigate to a version's full profile page (mirrors navToReactor) */
 function navToVersion(id) {
-  show('future');
-  setTimeout(() => {
-    const card = document.querySelector('.fs-ver-card[data-version-id="' + id + '"]');
-    if (card) {
-      if (!card.classList.contains('open')) {
-        const header = card.querySelector('.fs-ver-header');
-        if (header) header.click();
-      }
-      const y = card.getBoundingClientRect().top + window.pageYOffset - 80;
-      window.scrollTo({ top: y, behavior: 'smooth' });
-    }
-    document.querySelectorAll('#futureSubnav .nav-sub-item').forEach(b => b.classList.remove('active'));
-    const btn = document.querySelector('#futureSubnav [data-version-id="' + id + '"]');
-    if (btn) btn.classList.add('active');
-  }, 150);
+  const v = (S.futureScope.subsections || []).find(x => x.id === id);
+  if (!v) return;
+  S.selectedVersion = id;
+  renderVersionProfile(v);
+  show('version-profile');
+  /* mark Future Scope nav-item active + the matching sub-item active */
+  document.querySelectorAll('[data-target="future"]').forEach(b => b.classList.add('active'));
+  document.querySelectorAll('.nav-sub-item').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector('#futureSubnav [data-version-id="' + id + '"]');
+  if (btn) btn.classList.add('active');
 }
 window.navToVersion = navToVersion;
 
