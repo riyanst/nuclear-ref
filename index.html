@@ -1656,6 +1656,8 @@ mark.cm-highlight {
         Future Scope
       </button>
 
+      <div class="nav-sub" id="futureSubnav"></div>
+
       <div class="nav-divider"></div>
 
       <button class="nav-item" data-target="glossary">
@@ -2060,6 +2062,7 @@ function loadAll() {
     const d = snap.data() || {};
     S.futureScope.subsections = d.items || [];
     renderFuture();
+    renderFutureSubnav();
     if (S.isAdmin && S.adminTab === 'future') renderAdminFuture();
   });
   db.collection('future_scope').doc('design-canvas').onSnapshot(snap => {
@@ -2263,7 +2266,7 @@ function renderVersionCard(v, i, dc) {
   body += '<div class="fs-ver-foot">' + fsStatusPill(v.status) + '</div>';
 
   return `
-    <div class="fs-ver-card" id="fs-ver-card-${i}">
+    <div class="fs-ver-card" id="fs-ver-card-${i}" data-version-id="${esc(v.id || '')}">
       <button class="fs-ver-header" onclick="fsToggleVersion(${i})">
         <span class="fs-ver-header-left">
           <span class="fs-ver-tag">${esc(ver)}</span>
@@ -2380,6 +2383,52 @@ function renderSidebarNav() {
   el.innerHTML = S.reactors.map(r => `
     <button class="nav-sub-item" data-reactor="${esc(r.id)}" onclick="navToReactor('${esc(r.id)}')">${esc(r.name)}</button>`).join('');
 }
+
+/* short nav label for a version, e.g. "Version 3 — Conceptual Baseline" → "v3 — Baseline" */
+function versionShortLabel(v) {
+  const num = v.versionNumber || '';
+  const title = v.title || '';
+  let label = '';
+  const dashIdx = title.search(/[—–-]/);
+  if (dashIdx !== -1) {
+    label = title.slice(dashIdx + 1).replace(/^[\s—–-]+/, '').trim();
+  } else {
+    label = title.trim();
+  }
+  if (label.length > 14) {
+    const words = label.split(/\s+/);
+    label = words[words.length - 1];
+  }
+  return label ? (num + ' — ' + label) : num;
+}
+
+function renderFutureSubnav() {
+  const el = document.getElementById('futureSubnav');
+  if (!el) return;
+  const versions = S.futureScope.subsections || [];
+  el.innerHTML = versions.map(v => `
+    <button class="nav-sub-item" data-version-id="${esc(v.id)}" onclick="navToVersion('${esc(v.id)}')">${esc(versionShortLabel(v))}</button>`).join('');
+}
+
+/* navigate to Future Scope, open + reveal the matching version accordion card */
+function navToVersion(id) {
+  show('future');
+  setTimeout(() => {
+    const card = document.querySelector('.fs-ver-card[data-version-id="' + id + '"]');
+    if (card) {
+      if (!card.classList.contains('open')) {
+        const header = card.querySelector('.fs-ver-header');
+        if (header) header.click();
+      }
+      const y = card.getBoundingClientRect().top + window.pageYOffset - 80;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
+    document.querySelectorAll('#futureSubnav .nav-sub-item').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector('#futureSubnav [data-version-id="' + id + '"]');
+    if (btn) btn.classList.add('active');
+  }, 150);
+}
+window.navToVersion = navToVersion;
 
 function setHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
 
