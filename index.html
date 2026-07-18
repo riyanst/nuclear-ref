@@ -1746,7 +1746,10 @@ mark.cm-highlight {
       <h1 class="page-title">Content <strong>editor.</strong></h1>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px">
         <p style="font-size:14px;color:var(--text-3)">Editing NuclearRef — all changes save directly to Firestore.</p>
-        <button class="btn-ghost" style="font-size:12px" onclick="adminSignOut()">Sign out</button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn-ghost" style="font-size:12px" id="export-btn" onclick="exportAllContent()">Export All Content</button>
+          <button class="btn-ghost" style="font-size:12px" onclick="adminSignOut()">Sign out</button>
+        </div>
       </div>
       <div class="admin-tabs">
         <button class="admin-tab active" onclick="switchAdminTab('home',this)">Home</button>
@@ -2656,6 +2659,141 @@ function adminSignOut() {
   updateAdminUI();
   show('home');
 }
+
+async function exportAllContent() {
+  if (!S.isAdmin) return;
+  const btn = document.getElementById('export-btn');
+  if (btn) { btn.textContent = 'Exporting…'; btn.disabled = true; }
+  try {
+    const [pagesSnap, reactorsSnap, glossarySnap, fsSnap, ddSnap, refsSnap] = await Promise.all([
+      db.collection('pages').get(),
+      db.collection('reactors').get(),
+      db.collection('glossary').get(),
+      db.collection('future_scope').get(),
+      db.collection('drilldown').get(),
+      db.collection('references').get()
+    ]);
+
+    const pages = {};
+    pagesSnap.forEach(d => { pages[d.id] = d.data(); });
+
+    const reactors = [];
+    reactorsSnap.forEach(d => { reactors.push({ id: d.id, ...d.data() }); });
+
+    const glossary = [];
+    glossarySnap.forEach(d => { glossary.push({ id: d.id, ...d.data() }); });
+
+    const future_scope = {};
+    fsSnap.forEach(d => {
+      const key = d.id.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      future_scope[key] = d.data();
+    });
+
+    const drilldown = [];
+    ddSnap.forEach(d => { drilldown.push({ id: d.id, ...d.data() }); });
+
+    const references = [];
+    refsSnap.forEach(d => { references.push({ id: d.id, ...d.data() }); });
+
+    const hardcoded_text = {
+      sidebar: {
+        logoText: 'NuclearRef',
+        logoSub: 'Nuclear Technology Reference',
+        navLabel_technology: 'Technology',
+        nav_home: 'Home',
+        nav_reactors: 'Reactors',
+        nav_futureScope: 'Future Scope',
+        nav_glossary: 'Glossary',
+        nav_about: 'About',
+        footer_earlyAccess: 'Early access',
+        footer_version: 'v0.1'
+      },
+      home: {
+        eyebrow: 'Welcome to NuclearRef',
+        pageTitle: 'Nuclear technology, clearly explained.',
+        pageSubtitle: 'A structured reference platform for people who want to understand nuclear technology — without the jargon, without the oversimplification, and without the agenda.',
+        sectionHeader_whatItIs: 'What this platform is',
+        sectionHeader_whoItsFor: "Who it's for",
+        sectionHeader_howToUse: 'How to use it',
+        stat_reactorProfiles: 'Reactor profiles',
+        stat_researchDomain: 'Research domain',
+        stat_researchDomainValue: '1',
+        stat_inDevelopment: 'In continuous development'
+      },
+      reactors: {
+        eyebrow: 'Technology',
+        pageTitle: 'Reactor profiles.',
+        pageSubtitle: 'Each profile covers design overview, key materials, operating conditions, and current status — written for intelligent non-specialists.'
+      },
+      reactorProfile: {
+        blockLabel_designOverview: 'Design Overview',
+        blockLabel_keyMaterials: 'Key Materials',
+        blockLabel_operatingConditions: 'Operating Conditions',
+        blockLabel_currentStatus: 'Current Status',
+        blockLabel_references: 'References'
+      },
+      futureScope: {
+        eyebrow: 'Technology / Future Scope',
+        pageTitle: 'Future scope.',
+        pageSubtitle: 'Two directions. One convergence point. Where what is proven meets what is possible.',
+        trackTag_trace: 'TRACE — What already exists. What has been proven.',
+        trackTag_forge: 'FORGE — The ideal. Worked backwards toward reality.',
+        versionCardCta: 'View version →'
+      },
+      glossary: {
+        eyebrow: 'Reference',
+        pageTitle: 'Glossary.',
+        pageSubtitle: 'Key terms from nuclear physics, reactor engineering, and propulsion — explained plainly.'
+      },
+      about: {
+        eyebrow: 'About',
+        pageTitle: 'Built for clarity.',
+        pageSubtitle: 'NuclearRef exists because nuclear technology deserves better public understanding.',
+        cardLabel_whoBuiltThis: 'Who built this',
+        cardLabel_why: 'Why',
+        cardLabel_editorialApproach: 'Editorial approach',
+        cardLabel_whatsNext: "What's next"
+      },
+      territoryTransition: {
+        forgeToTrace_topLabel: 'Leaving the realm of possibility',
+        forgeToTrace_centerText: 'Tracing knowledge from imagination to reality…',
+        traceToForge_topLabel: 'Leaving demonstrated reality',
+        traceToForge_centerText: 'Returning to imagination…',
+        traceToForge_destLabel: 'FUTURE SCOPE — FORGE CONCEPT',
+        traceToForge_destReactor: 'FORGE'
+      }
+    };
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      pages,
+      reactors,
+      glossary,
+      future_scope,
+      drilldown,
+      references,
+      hardcoded_text
+    };
+
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const today = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nuclearref-export-' + today + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Export downloaded.', 'success');
+  } catch (e) {
+    showToast('Export failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = 'Export All Content'; btn.disabled = false; }
+  }
+}
+window.exportAllContent = exportAllContent;
 
 function updateAdminUI() {
   const btn = document.getElementById('adminLockBtn');
