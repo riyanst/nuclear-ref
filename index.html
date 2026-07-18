@@ -1712,7 +1712,7 @@ mark.cm-highlight {
     <section id="future" class="section">
       <div class="eyebrow">Technology / Future Scope</div>
       <h1 class="page-title">Future <strong>scope.</strong></h1>
-      <p class="page-subtitle">Where demonstrated nuclear engineering meets fusion research — the ART Corp convergence framework.</p>
+      <p class="page-subtitle">Two directions. One convergence point. Where what is proven meets what is possible.</p>
       <div id="future-body"></div>
     </section>
 
@@ -1784,9 +1784,9 @@ mark.cm-highlight {
   <!-- TERRITORY TRANSITION OVERLAY (FORGE → TRACE deep link) -->
   <div id="territory-transition-overlay">
     <div class="tt-inner">
-      <div class="tt-top-label" id="tt-top-label">Leaving FORGE Territory</div>
+      <div class="tt-top-label" id="tt-top-label">Leaving the realm of possibility</div>
       <div id="transition-line-wrap"><div id="transition-line"></div></div>
-      <div class="tt-center-text" id="tt-center-text">Tracing knowledge to TRACE…</div>
+      <div class="tt-center-text" id="tt-center-text">Tracing knowledge from imagination to reality…</div>
       <div class="tt-dest-wrap" id="tt-dest-wrap">
         <div class="tt-dest-label" id="tt-dest-label">NERVA — OPERATING CONDITIONS</div>
         <div class="tt-dest-reactor" id="tt-dest-reactor">NERVA</div>
@@ -1953,7 +1953,7 @@ async function seedIfNeeded() {
       const fsBatch = db.batch();
       fsBatch.set(db.collection('future_scope').doc('concept-overview'), {
         title: 'Concept Overview',
-        body: 'The existing reactor profiles on this platform represent the current frontier of demonstrated nuclear technology. The ART Corp Compact Fusion Concept approaches the same energy problem from the opposite direction — starting from an ideal fuel source (seawater-derived deuterium, effectively limitless) and working backwards toward a buildable design. Where these two approaches converge is the research objective.',
+        body: 'The existing reactor profiles on this platform represent the current frontier of demonstrated nuclear technology. The Compact Fusion Concept approaches the same energy problem from the opposite direction — starting from an ideal fuel source (seawater-derived deuterium, effectively limitless) and working backwards toward a buildable design. Where these two approaches converge is the research objective.',
         lastUpdated: new Date().toISOString()
       });
       fsBatch.set(db.collection('future_scope').doc('trace'), {
@@ -1965,12 +1965,12 @@ async function seedIfNeeded() {
       fsBatch.set(db.collection('future_scope').doc('forge'), {
         title: 'FORGE',
         subtitle: 'Fusion Originated Research and Generative Engineering',
-        body: 'The ART Corp Compact Fusion Concept starts from the opposite end. Beginning with the ideal: seawater-derived deuterium as a practically limitless fuel source, the design works backwards toward a buildable compact tokamak. Primary fuel: D-T. Secondary capability: D-D. Internal tritium production via lithium breeding blanket.',
+        body: 'The Compact Fusion Concept starts from the opposite end. Beginning with the ideal: seawater-derived deuterium as a practically limitless fuel source, the design works backwards toward a buildable compact tokamak. Primary fuel: D-T. Secondary capability: D-D. Internal tritium production via lithium breeding blanket.',
         lastUpdated: new Date().toISOString()
       });
       fsBatch.set(db.collection('future_scope').doc('convergence'), {
         title: 'Convergence',
-        body: 'TRACE and FORGE are not separate tracks. They are two directions converging on a single point — a compact fusion reactor design that is grounded in demonstrated engineering reality and built toward from first principles. The convergence of these two methodologies is the ART Corp research objective and the basis of the forthcoming review paper.',
+        body: 'TRACE and FORGE are not separate tracks. They are two directions converging on a single point — a compact fusion reactor design that is grounded in demonstrated engineering reality and built toward from first principles. Where TRACE and FORGE converge is the research objective — and the basis of a forthcoming review paper.',
         lastUpdated: new Date().toISOString()
       });
       fsBatch.set(db.collection('future_scope').doc('subsections'), { items: [] });
@@ -2128,7 +2128,7 @@ function renderFuture() {
   /* 2. TRACE */
   if (tr.title || tr.body) {
     html += '<div class="fs-track-block">';
-    html += '<div class="fs-track-tag">TRACE — Technology Reference and Comparative Engineering</div>';
+    html += '<div class="fs-track-tag">TRACE — What already exists. What has been proven.</div>';
     if (tr.title)    html += '<div class="fs-track-title">' + esc(tr.title) + '</div>';
     if (tr.subtitle) html += '<div class="fs-track-subtitle">' + esc(tr.subtitle) + '</div>';
     if (tr.body)     html += '<div class="fs-track-body">' + esc(tr.body) + '</div>';
@@ -2138,7 +2138,7 @@ function renderFuture() {
   /* 3. FORGE */
   if (fo.title || fo.body) {
     html += '<div class="fs-track-block">';
-    html += '<div class="fs-track-tag">FORGE — Fusion Originated Research and Generative Engineering</div>';
+    html += '<div class="fs-track-tag">FORGE — The ideal. Worked backwards toward reality.</div>';
     if (fo.title)    html += '<div class="fs-track-title">' + esc(fo.title) + '</div>';
     if (fo.subtitle) html += '<div class="fs-track-subtitle">' + esc(fo.subtitle) + '</div>';
     if (fo.body)     html += '<div class="fs-track-body">' + esc(fo.body) + '</div>';
@@ -2535,8 +2535,8 @@ function triggerTerritoryTransition(reactorId, sectionSlug, sentence) {
   const rn = reactorNameById(reactorId);
   const secLabel = sec ? sec.label : (sectionSlug || '');
   runTerritoryTransition({
-    topLabel: 'Leaving FORGE Territory',
-    centerText: 'Tracing knowledge to TRACE…',
+    topLabel: 'Leaving the realm of possibility',
+    centerText: 'Tracing knowledge from imagination to reality…',
     destLabel: (rn + ' — ' + secLabel).toUpperCase(),
     destReactor: rn,
     onComplete: () => doTraceNavigate(reactorId, sectionSlug, sentence)
@@ -2547,8 +2547,8 @@ window.triggerTerritoryTransition = triggerTerritoryTransition;
 /* TRACE → FORGE: reverse transition, then return to Future Scope */
 function triggerReturnToForge() {
   runTerritoryTransition({
-    topLabel: 'Leaving TRACE Territory',
-    centerText: 'Returning to FORGE…',
+    topLabel: 'Leaving demonstrated reality',
+    centerText: 'Returning to imagination…',
     destLabel: 'FUTURE SCOPE — FORGE CONCEPT',
     destReactor: 'FORGE',
     onComplete: () => {
